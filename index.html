@@ -51,6 +51,46 @@ svg{display:block}
 
 #app{position:fixed;inset:0;overflow:hidden;isolation:isolate;background:var(--ink)}
 #scene{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
+@property --frame-angle{syntax:"<angle>";inherits:false;initial-value:0deg}
+.impact-frame{
+  --frame-color:var(--amber);
+  position:absolute;inset:11px;z-index:16;pointer-events:none;border:1px solid rgba(244,232,210,.12);
+  opacity:0;transition:opacity .2s ease,filter .2s ease;
+  box-shadow:inset 0 0 30px color-mix(in srgb,var(--frame-color) 9%,transparent);
+}
+.impact-frame.is-active{opacity:.72}
+.impact-frame::before{
+  content:"";position:absolute;inset:-1px;border:2px solid transparent;
+  background:linear-gradient(rgba(7,21,17,.02),rgba(7,21,17,.02)) padding-box,
+    conic-gradient(from var(--frame-angle),transparent 0deg 34deg,var(--frame-color) 54deg 76deg,transparent 96deg 174deg,var(--frame-color) 194deg 216deg,transparent 236deg 360deg) border-box;
+  filter:drop-shadow(0 0 7px var(--frame-color));opacity:.82;
+  animation:frameOrbit 2.4s linear infinite;
+}
+.impact-frame::after{
+  content:"";position:absolute;inset:1px;opacity:.34;
+  background:
+    linear-gradient(var(--frame-color),var(--frame-color)) left top/42px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) left top/2px 42px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right top/42px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right top/2px 42px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) left bottom/42px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) left bottom/2px 42px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right bottom/42px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right bottom/2px 42px no-repeat;
+}
+.impact-frame.is-airborne::after{animation:frameBreath 1.2s ease-in-out infinite}
+.impact-frame.is-impact::after{animation:frameImpact .72s ease-out 2}
+.impact-frame.is-crashing{filter:saturate(1.55)}
+.impact-frame.is-crashing.is-tier-2::before{animation-duration:.46s;filter:drop-shadow(0 0 12px var(--frame-color))}
+.impact-frame.is-tier-1::before{animation-duration:1.9s}
+.impact-frame.is-tier-2::before{animation-duration:1.25s;opacity:.94}
+.impact-frame.is-tier-3::before{animation-duration:.78s;opacity:1;border-width:3px;filter:drop-shadow(0 0 13px var(--frame-color))}
+.impact-frame.is-impact::before{animation-duration:.7s;animation-iteration-count:1}
+.impact-frame.is-impact.is-tier-2::before{animation-duration:.5s;animation-iteration-count:2}
+.impact-frame.is-impact.is-tier-3::before{animation-duration:.42s;animation-iteration-count:3}
+@keyframes frameOrbit{to{--frame-angle:360deg}}
+@keyframes frameBreath{0%,100%{opacity:.22}50%{opacity:.8}}
+@keyframes frameImpact{0%{opacity:1;filter:brightness(2.6)}100%{opacity:.2;filter:brightness(1)}}
 .vignette{
   position:absolute;inset:0;z-index:3;pointer-events:none;
   box-shadow:inset 0 0 180px rgba(1,8,6,.55), inset 0 -90px 120px rgba(1,8,6,.28);
@@ -406,6 +446,7 @@ kbd{
   <div class="vignette" aria-hidden="true"></div>
   <div class="top-scrim" aria-hidden="true"></div>
   <div class="bottom-scrim" aria-hidden="true"></div>
+  <div class="impact-frame" id="impactFrame" aria-hidden="true"></div>
 
   <header class="hud is-hidden" id="hud" aria-label="行车信息">
     <div class="brand" aria-hidden="true">
@@ -424,7 +465,7 @@ kbd{
 
     <div class="hud-right">
       <div class="hud-tools">
-        <div class="coin-chip" title="本程金币"><span class="coin-mark" aria-hidden="true"></span><span id="coinValue">0</span></div>
+        <div class="coin-chip" title="累计金币"><span class="coin-mark" aria-hidden="true"></span><span id="coinValue">0</span></div>
         <button class="icon-btn" id="muteBtn" type="button" aria-label="静音" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 9.5h3.4L12 5.7v12.6l-4.6-3.8H4z"/>
@@ -506,7 +547,7 @@ kbd{
       <p class="modal-copy">风还在吹，油还在油箱里。继续向上，或者从起点重新出发。</p>
       <div class="stats">
         <div class="stat"><span>当前距离</span><strong id="pauseDistance">0<small>m</small></strong></div>
-        <div class="stat"><span>金币</span><strong id="pauseCoins">0</strong></div>
+        <div class="stat"><span>本程获得</span><strong id="pauseCoins">0</strong></div>
         <div class="stat"><span>燃油</span><strong id="pauseFuel">100<small>%</small></strong></div>
       </div>
       <div class="modal-actions">
@@ -528,7 +569,7 @@ kbd{
       <div class="record-note" id="newRecord" hidden>新的个人纪录</div>
       <div class="stats">
         <div class="stat"><span>本次距离</span><strong id="resultDistance">0<small>m</small></strong></div>
-        <div class="stat"><span>金币</span><strong id="resultCoins">0</strong></div>
+        <div class="stat"><span>本程获得</span><strong id="resultCoins">0</strong></div>
         <div class="stat"><span>个人最佳</span><strong id="resultBest">0<small>m</small></strong></div>
       </div>
       <div class="modal-actions">
@@ -552,6 +593,7 @@ kbd{
   const app = document.getElementById("app");
 
   const el = {
+    frame: document.getElementById("impactFrame"),
     hud: document.getElementById("hud"),
     distance: document.getElementById("distanceValue"),
     bestHud: document.getElementById("bestHud"),
@@ -626,6 +668,11 @@ kbd{
   const ENGINE = 1760;
   const BRAKE = 2550;
   const SAVE_KEY = "ridge-run-v1";
+  const JUMP_STAGES = [
+    { time: 0.35, reward: 1, title: "飞跃", color: "#f0b15e" },
+    { time: 0.8, reward: 3, title: "大飞跃", color: "#89d8c8" },
+    { time: 1.5, reward: 6, title: "超级飞跃", color: "#fff0bd" },
+  ];
 
   let W = 1, H = 1, DPR = 1, baseScale = 30;
   const camera = { x: START_X, y: 0, scale: 30 };
@@ -668,7 +715,9 @@ kbd{
   let lowFuelWarned = false;
   let stuckTimer = 0;
   let exhaustTimer = 0;
-  let contactWasAir = true;
+  let hasTouchedGround = false;
+  const jump = { airborne: false, duration: 0, tier: 0, flash: 0, flashColor: "#f0b15e", landing: 0, landingTier: 0, calloutTime: 0, calloutTier: 0, calloutReward: 0 };
+  const frameFx = { mode: "off", airborne: false, pulse: 0, tier: 0, color: "#f0b15e" };
   let chunkCursor = 0;
   let items = [];
   let particles = [];
@@ -690,15 +739,16 @@ kbd{
       const parsed = raw ? JSON.parse(raw) : {};
       return {
         best: Math.max(0, Number(parsed.best) || 0),
+        coins: Math.max(0, Math.floor(Number(parsed.coins) || 0)),
         muted: !!parsed.muted,
       };
     } catch (_) {
-      return { best: 0, muted: false };
+      return { best: 0, coins: 0, muted: false };
     }
   }
   function persist() {
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ best: save.best, muted }));
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ best: save.best, coins: save.coins, muted }));
     } catch (_) {}
   }
 
@@ -908,6 +958,7 @@ kbd{
   function clearPressed() {
     touch.gas = false;
     touch.brake = false;
+    for (const key of Object.keys(keys)) keys[key] = false;
     el.gasBtn.classList.remove("is-pressed");
     el.brakeBtn.classList.remove("is-pressed");
   }
@@ -1007,16 +1058,28 @@ kbd{
     }
   }
 
-  function resetRun() {
+  function resetRun(preserveRunCoins) {
     fuel = 100;
-    coins = 0;
+    if (!preserveRunCoins) coins = 0;
     distance = 0;
     emptyTimer = 0;
     emptyWarned = false;
     lowFuelWarned = false;
     stuckTimer = 0;
     exhaustTimer = 0;
-    contactWasAir = true;
+    hasTouchedGround = false;
+    jump.airborne = false;
+    jump.duration = 0;
+    jump.tier = 0;
+    jump.flash = 0;
+    jump.flashColor = "#f0b15e";
+    jump.landing = 0;
+    jump.landingTier = 0;
+    jump.calloutTime = 0;
+    jump.calloutTier = 0;
+    jump.calloutReward = 0;
+    setFrameFx("off", 0, "#f0b15e", 0);
+    shake = 0;
     items = [];
     particles = [];
     chunkCursor = 0;
@@ -1124,9 +1187,36 @@ kbd{
     car.contactCount = 0;
     stuckTimer = 0;
     emptyTimer = 0;
-    contactWasAir = true;
+    jump.airborne = false;
+    jump.duration = 0;
+    jump.tier = 0;
+    jump.flash = 0;
+    jump.landing = 0;
+    jump.landingTier = 0;
+    jump.calloutTime = 0;
+    jump.calloutTier = 0;
+    jump.calloutReward = 0;
+    setFrameFx("off", 0, "#f0b15e", 0);
+    hasTouchedGround = false;
     addShake(0.45);
-    showToast(auto ? "回到山脊" : "回到赛道", "距离保留，继续向上");
+    showToast(auto ? "回到山脊" : "回到赛道", "本程进度保留，继续向上");
+  }
+
+  function restartAfterCrash() {
+    const finalDistance = Math.floor(distance);
+    if (finalDistance > save.best) {
+      save.best = finalDistance;
+      persist();
+      updateBestUi();
+    }
+    resetRun(true);
+    clearPressed();
+    accumulator = 0;
+    snapCamera();
+    addShake(0.85);
+    spawnResetBurst();
+    setFrameFx("impact", 2, "#f0b15e", 1.05);
+    showToast("整备完成", "回到起点 · 纪录与金币已保留");
   }
 
   /* ---------- particles ---------- */
@@ -1183,6 +1273,85 @@ kbd{
     }
   }
 
+  function spawnShockwave(x, y, color, maxRadius) {
+    addParticle({
+      type: "shockwave",
+      x,
+      y,
+      life: 0.62,
+      maxLife: 0.62,
+      radius: maxRadius || 4,
+      color: color || "#f0b15e",
+    });
+  }
+
+  function spawnJumpBurst(x, y, tier, color) {
+    const count = tier === 3 ? 38 : tier === 2 ? 28 : 18;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * TAU + (Math.random() - 0.5) * 0.16;
+      const speed = (tier === 3 ? 8 : tier === 2 ? 6.5 : 5) * (0.55 + Math.random() * 0.7);
+      addParticle({
+        type: "streak",
+        x,
+        y,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed - 1.2,
+        life: 0.32 + Math.random() * 0.42,
+        maxLife: 0.74,
+        size: 0.055 + Math.random() * 0.08,
+        length: 0.28 + Math.random() * 0.55,
+        color: color || "#f0b15e",
+      });
+    }
+  }
+
+  function spawnLandingBurst(tier, color) {
+    const count = 12 + tier * 8;
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      addParticle({
+        type: "streak",
+        x: car.x + side * (0.45 + Math.random() * 1.25),
+        y: heightAt(car.x) - 0.03,
+        vx: side * (1.2 + Math.random() * (2.5 + tier)),
+        vy: -0.5 - Math.random() * (1.8 + tier * 0.65),
+        life: 0.28 + Math.random() * 0.35,
+        maxLife: 0.63,
+        size: 0.05 + Math.random() * 0.08,
+        length: 0.22 + Math.random() * 0.4,
+        color: color || "#f0b15e",
+      });
+    }
+    for (let i = 0; i < 3 + tier; i++) {
+      spawnDust(car.x + (Math.random() - 0.5) * 2.4, heightAt(car.x) + 0.04, i % 2 ? 1 : -1);
+    }
+  }
+
+  function spawnCoinReward(x, y, count) {
+    for (let i = 0; i < count; i++) {
+      const a = (i / Math.max(1, count)) * TAU - Math.PI / 2;
+      const speed = 1.1 + Math.random() * 1.1;
+      addParticle({
+        type: "coin",
+        x,
+        y,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed - 1.25,
+        life: 1 + Math.random() * 0.2,
+        maxLife: 1.2,
+        size: 0.19,
+        phase: Math.random() * TAU,
+      });
+    }
+  }
+
+  function spawnResetBurst() {
+    spawnShockwave(car.x, car.y, "#f0b15e", 5.2);
+    spawnJumpBurst(car.x, car.y, 2, "#f0b15e");
+    spawnDust(car.x - 1, heightAt(car.x - 1), -1);
+    spawnDust(car.x + 1, heightAt(car.x + 1), 1);
+  }
+
   function updateParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -1191,10 +1360,13 @@ kbd{
         particles.splice(i, 1);
         continue;
       }
-      p.vy += (p.type === "dust" ? 1.4 : p.type === "smoke" ? -0.18 : 5.2) * dt;
-      p.vx *= Math.exp(-0.7 * dt);
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
+      if (p.type !== "shockwave") {
+        p.vy += (p.type === "dust" ? 1.4 : p.type === "smoke" ? -0.18 : p.type === "coin" ? 2.1 : 5.2) * dt;
+        p.vx *= Math.exp(-0.7 * dt);
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.type === "coin") p.phase += dt * 12;
+      }
     }
   }
 
@@ -1202,6 +1374,8 @@ kbd{
   function collectItem(item) {
     if (item.type === "coin") {
       coins++;
+      save.coins++;
+      persist();
       pickupSound("coin");
       spawnPickup(item.x, item.y, "#f4c76d");
       item.alive = false;
@@ -1247,7 +1421,94 @@ kbd{
 
   /* ---------- crash / physics ---------- */
   function addShake(v) {
-    shake = Math.min(1.6, shake + v);
+    shake = Math.min(2.6, shake + v);
+  }
+
+  function syncFrameFx() {
+    const active = frameFx.airborne || frameFx.pulse > 0;
+    el.frame.classList.toggle("is-active", active);
+    el.frame.classList.toggle("is-airborne", frameFx.airborne);
+    el.frame.classList.toggle("is-impact", frameFx.mode === "impact");
+    el.frame.classList.toggle("is-crashing", frameFx.mode === "crash");
+    for (let tier = 1; tier <= JUMP_STAGES.length; tier++) {
+      el.frame.classList.toggle("is-tier-" + tier, frameFx.tier === tier);
+    }
+    el.frame.style.setProperty("--frame-color", frameFx.color);
+  }
+
+  function setFrameFx(mode, tier, color, pulse) {
+    frameFx.mode = mode;
+    frameFx.airborne = mode === "air";
+    frameFx.tier = tier || 0;
+    frameFx.color = color || "#f0b15e";
+    frameFx.pulse = pulse || 0;
+    syncFrameFx();
+  }
+
+  function beginJump() {
+    jump.airborne = true;
+    jump.duration = 0;
+    jump.tier = 0;
+    jump.flash = 0.46;
+    jump.flashColor = "#f0b15e";
+    jump.landing = 0;
+    setFrameFx("air", 0, "#f0b15e", 0.48);
+    addShake(0.38);
+    spawnShockwave(car.x, car.y + 0.45, "#f0b15e", 3.4);
+    spawnJumpBurst(car.x, car.y, 1, "#f0b15e");
+    spawnDust(car.x - 0.8, heightAt(car.x - 0.8), -1);
+    spawnDust(car.x + 0.8, heightAt(car.x + 0.8), 1);
+    chime(480, 0.12, "triangle", 0.035, 720);
+    showToast("腾空", "稳住车身，跨越飞跃门槛");
+  }
+
+  function triggerJumpTier(tier) {
+    const stage = JUMP_STAGES[tier - 1];
+    const scale = tier === 3 ? 1.6 : tier === 2 ? 1.25 : 1;
+    jump.tier = tier;
+    jump.flash = 0.25 + tier * 0.12;
+    jump.flashColor = stage.color;
+    jump.calloutTime = 1.05;
+    jump.calloutTier = tier;
+    jump.calloutReward = 0;
+    setFrameFx("air", tier, stage.color, 0.58);
+    addShake(0.36 * scale);
+    spawnShockwave(car.x, car.y, stage.color, 3.6 + tier * 1.8);
+    spawnJumpBurst(car.x, car.y, tier, stage.color);
+    const note = tier === 3 ? 1320 : tier === 2 ? 920 : 680;
+    chime(note, 0.17 + tier * 0.035, "triangle", 0.035 + tier * 0.01, note * 1.42);
+    showToast(stage.title, "落地结算 +" + stage.reward + " 金币");
+  }
+
+  function finishJump() {
+    const tier = jump.tier;
+    const stage = tier ? JUMP_STAGES[tier - 1] : null;
+    const color = stage ? stage.color : "#f0b15e";
+    jump.airborne = false;
+    jump.landing = tier ? 0.86 : 0.34;
+    jump.landingTier = tier;
+    jump.flash = tier ? 0.24 : 0.1;
+    jump.flashColor = color;
+    jump.calloutTime = tier ? 1.2 : 0;
+    jump.calloutTier = tier;
+    jump.calloutReward = stage ? stage.reward : 0;
+    setFrameFx("impact", tier, color, tier === 3 ? 1.3 : tier === 2 ? 1.05 : tier === 1 ? 0.72 : 0.34);
+    spawnShockwave(car.x, heightAt(car.x) - 0.04, color, tier ? 4 + tier * 2.2 : 2.6);
+    spawnLandingBurst(tier, color);
+    addShake(tier === 3 ? 1.12 : tier === 2 ? 0.78 : tier === 1 ? 0.48 : 0.22);
+    if (stage) {
+      coins += stage.reward;
+      save.coins += stage.reward;
+      persist();
+      spawnCoinReward(car.x, car.y - 0.7, stage.reward);
+      pickupSound("coin");
+      el.coins.classList.remove("is-bumped");
+      void el.coins.offsetWidth;
+      el.coins.classList.add("is-bumped");
+      showToast(stage.title + " +" + stage.reward, "完美落地 · 金币已入账");
+    }
+    jump.duration = 0;
+    jump.tier = 0;
   }
 
   function roofHitsGround() {
@@ -1265,6 +1526,15 @@ kbd{
 
   function simulate(dt) {
     elapsed += dt;
+    jump.flash = Math.max(0, jump.flash - dt);
+    jump.landing = Math.max(0, jump.landing - dt);
+    jump.calloutTime = Math.max(0, jump.calloutTime - dt);
+    if (!frameFx.airborne && frameFx.pulse > 0) {
+      frameFx.pulse = Math.max(0, frameFx.pulse - dt);
+      if (frameFx.pulse === 0) setFrameFx("off", 0, frameFx.color, 0);
+    }
+
+    const wasGrounded = car.contactCount > 0;
 
     const gasHeld = readGas();
     const brakeHeld = readBrake();
@@ -1368,25 +1638,43 @@ kbd{
       stuckTimer = 0;
     }
 
-    if (car.contactCount > 0 && contactWasAir && car.vy > 2.7) {
-      addShake(0.75);
-      spawnDust(car.x, car.y + 0.5, 0);
-      spawnDust(car.x + 0.7, car.y + 0.45, 1);
+    const groundedNow = car.contactCount > 0;
+    if (!groundedNow && wasGrounded && hasTouchedGround) beginJump();
+    if (!groundedNow && jump.airborne) {
+      jump.duration += dt;
+      while (jump.tier < JUMP_STAGES.length && jump.duration + 0.000001 >= JUMP_STAGES[jump.tier].time) {
+        triggerJumpTier(jump.tier + 1);
+      }
+    } else if (groundedNow && jump.airborne) {
+      finishJump();
     }
-    contactWasAir = car.contactCount === 0;
+    if (groundedNow && !wasGrounded && car.vy > 2.7 && !jump.landing) {
+      addShake(0.55);
+      spawnDust(car.x - 0.75, car.y + 0.45, -1);
+      spawnDust(car.x + 0.75, car.y + 0.45, 1);
+    }
+    if (groundedNow) hasTouchedGround = true;
 
     if (!car.crashed && (roofHitsGround() || (Math.abs(Math.atan2(Math.sin(car.angle), Math.cos(car.angle))) > 2.25 && car.contactCount > 0))) {
       car.crashed = true;
       car.crashTimer = 0;
       car.omega *= 0.55;
       addShake(1.05);
+      jump.airborne = false;
+      jump.duration = 0;
+      jump.tier = 0;
+      jump.flash = 0.4;
+      jump.flashColor = "#eb633a";
+      setFrameFx("crash", 2, "#eb633a", 1.5);
+      spawnShockwave(car.x, car.y, "#eb633a", 5.5);
+      spawnJumpBurst(car.x, car.y, 2, "#eb633a");
       crashSound();
-      showToast("翻车了", "稳住车身，马上回到山脊");
+      showToast("翻车了", "正在整备，马上回到起点");
     }
 
     if (car.crashed) {
       car.crashTimer += dt;
-      if (car.crashTimer > 1.5) respawn(false);
+      if (car.crashTimer > 1.5) restartAfterCrash();
     }
 
     if (car.contactCount > 0 && (throttle || brake) && Math.random() < dt * 28) {
@@ -1447,9 +1735,9 @@ kbd{
       el.bestHud.textContent = String(save.best);
       lastHud.best = save.best;
     }
-    if (force || coins !== lastHud.coins) {
-      el.coins.textContent = String(coins);
-      lastHud.coins = coins;
+    if (force || save.coins !== lastHud.coins) {
+      el.coins.textContent = String(save.coins);
+      lastHud.coins = save.coins;
     }
     const f = Math.ceil(fuel);
     if (force || f !== lastHud.fuel) {
@@ -1974,17 +2262,70 @@ kbd{
   function drawParticles(front) {
     ctx.save();
     for (const p of particles) {
-      const isSpark = p.type === "spark";
-      if (isSpark !== front) continue;
+      const isFront = p.type === "spark" || p.type === "streak" || p.type === "coin";
+      if (isFront !== front) continue;
       const x = toScreenX(p.x);
       const y = toScreenY(p.y);
       if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
       const k = clamp(p.life / p.maxLife, 0, 1);
       const r = Math.max(1, p.size * view.scale * (1.2 - k * 0.45));
+      if (p.type === "shockwave") {
+        const progress = 1 - k;
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = k * 0.68;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.2 + k * 2.4;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(1, p.radius * progress * view.scale), 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        continue;
+      }
       if (p.type === "dust") {
         ctx.fillStyle = "rgba(220,169,106," + (k * 0.23) + ")";
       } else if (p.type === "smoke") {
         ctx.fillStyle = "rgba(223,216,194," + (k * 0.12) + ")";
+      } else if (p.type === "streak") {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = k * 0.86;
+        ctx.strokeStyle = p.color || "#f4c76d";
+        ctx.lineWidth = Math.max(1, r * 0.46);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - p.vx * (p.length || 0.3) * view.scale * 0.12, y - p.vy * (p.length || 0.3) * view.scale * 0.12);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        continue;
+      } else if (p.type === "coin") {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(Math.sin(p.phase) * 0.18);
+        ctx.scale(Math.max(0.14, Math.abs(Math.cos(p.phase))), 1);
+        const coinR = Math.max(3, p.size * view.scale);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = k;
+        ctx.fillStyle = "#f4c76d";
+        ctx.beginPath();
+        ctx.arc(0, 0, coinR * 1.45, 0, TAU);
+        ctx.fill();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "#f4c76d";
+        ctx.strokeStyle = "#fff0bd";
+        ctx.lineWidth = Math.max(1, coinR * 0.14);
+        ctx.beginPath();
+        ctx.arc(0, 0, coinR, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "rgba(93,55,18,.72)";
+        ctx.font = "700 " + Math.max(6, coinR * 1.1) + "px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("+", 0, 0.5);
+        ctx.restore();
+        continue;
       } else {
         ctx.globalCompositeOperation = "lighter";
         ctx.fillStyle = p.color || "#f4c76d";
@@ -1998,6 +2339,97 @@ kbd{
         ctx.globalAlpha = 1;
       }
     }
+    ctx.restore();
+  }
+
+  function drawJumpAura(t) {
+    if (!jump.airborne || car.crashed) return;
+    const stage = jump.tier ? JUMP_STAGES[jump.tier - 1] : JUMP_STAGES[0];
+    const sx = toScreenX(car.x);
+    const sy = toScreenY(car.y);
+    const s = view.scale;
+    const pulse = 0.84 + Math.sin(t * 14) * 0.16;
+    const tier = Math.max(1, jump.tier);
+    const radius = s * (2.15 + tier * 0.38) * pulse;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const glow = ctx.createRadialGradient(sx, sy, s * 0.12, sx, sy, radius);
+    glow.addColorStop(0, stage.color + "55");
+    glow.addColorStop(0.48, stage.color + "20");
+    glow.addColorStop(1, stage.color + "00");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + s * 0.12, radius * 1.2, radius * 0.72, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.translate(sx, sy);
+    ctx.rotate(car.angle);
+    ctx.globalAlpha = 0.42 + tier * 0.12;
+    ctx.strokeStyle = stage.color;
+    ctx.lineWidth = Math.max(1, s * 0.035);
+    for (let i = 0; i < tier + 1; i++) {
+      const orbit = s * (1.35 + i * 0.37);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, orbit, orbit * (0.32 + i * 0.035), t * (i % 2 ? -1 : 1) * (0.9 + i * 0.22), 0.18 + i * 0.68, 2.48 + i * 0.68);
+      ctx.stroke();
+    }
+    const streakCount = tier * 4 + 2;
+    ctx.globalAlpha = 0.18 + tier * 0.1;
+    ctx.lineWidth = Math.max(1, s * 0.045);
+    for (let i = 0; i < streakCount; i++) {
+      const y = (i / Math.max(1, streakCount - 1) - 0.5) * s * 1.35;
+      const length = s * (0.52 + ((i * 7) % 5) * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(-s * 1.45 - length, y + Math.sin(t * 18 + i) * s * 0.08);
+      ctx.lineTo(-s * 1.3, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawJumpFlash() {
+    const strength = Math.max(jump.flash, jump.landing * 0.5);
+    if (strength <= 0) return;
+    const color = jump.flashColor;
+    const sx = toScreenX(car.x);
+    const sy = toScreenY(car.y);
+    ctx.save();
+    const flash = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.max(W, H) * 0.65);
+    flash.addColorStop(0, color + Math.round(Math.min(0.16, strength * 0.16) * 255).toString(16).padStart(2, "0"));
+    flash.addColorStop(0.36, color + "10");
+    flash.addColorStop(1, color + "00");
+    ctx.fillStyle = flash;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  function drawJumpCallout(t) {
+    if (jump.calloutTime <= 0 || !jump.calloutTier) return;
+    const stage = JUMP_STAGES[jump.calloutTier - 1];
+    const duration = jump.calloutReward ? 1.2 : 1.05;
+    const progress = 1 - jump.calloutTime / duration;
+    const alpha = Math.min(1, jump.calloutTime * 3);
+    const x = toScreenX(car.x);
+    const y = toScreenY(car.y) - 54 - progress * 24 + Math.sin(t * 9) * 2;
+    const title = stage.title + (jump.calloutTier === 3 ? "!!" : "!");
+    const subtitle = jump.calloutReward ? "+" + jump.calloutReward + " 金币" : jump.duration.toFixed(2) + "s IN AIR";
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "900 " + Math.max(24, Math.min(44, view.scale * 1.45)) + "px \"Noto Sans SC\",sans-serif";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(4, view.scale * 0.14);
+    ctx.strokeStyle = "rgba(7,21,17,.92)";
+    ctx.shadowColor = stage.color;
+    ctx.shadowBlur = 14 + jump.calloutTier * 7;
+    ctx.strokeText(title, x, y);
+    ctx.fillStyle = stage.color;
+    ctx.fillText(title, x, y);
+    ctx.shadowBlur = 0;
+    ctx.font = "500 " + Math.max(10, Math.min(15, view.scale * 0.44)) + "px \"IBM Plex Mono\",monospace";
+    ctx.fillStyle = "#fff0bd";
+    ctx.fillText(subtitle, x, y + Math.max(18, view.scale * 0.7));
     ctx.restore();
   }
 
@@ -2230,9 +2662,12 @@ kbd{
     drawTerrain(t);
     drawItems(t);
     drawParticles(false);
+    drawJumpAura(t);
     drawCar(t);
     drawParticles(true);
     drawAmbient(t);
+    drawJumpFlash();
+    drawJumpCallout(t);
 
     // gentle film grain, drawn from a tiny generated texture
     if (noisePattern) {
