@@ -1,0 +1,2413 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081511">
+<title>山脊冲刺</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23071511'/%3E%3Cpath d='M3 25 12.7 7l4.5 8.1L21.3 7 29 25H3Z' fill='none' stroke='%23f0b15e' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Alpine dusk: pine ink, sunlit paper, amber light, signal red. */
+  --ink:#071511;
+  --ink-2:#0e211b;
+  --ink-3:#18342b;
+  --paper:#f4e8d2;
+  --paper-dim:rgba(244,232,210,.64);
+  --paper-faint:rgba(244,232,210,.16);
+  --amber:#f0b15e;
+  --amber-soft:#e1c79a;
+  --signal:#eb633a;
+  --sage:#8ca494;
+  --line:rgba(244,232,210,.22);
+  --line-soft:rgba(244,232,210,.11);
+  --glass:rgba(5,15,12,.52);
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --sans:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+html{background:var(--ink)}
+body{
+  overflow:hidden;
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  -webkit-user-select:none;
+  overscroll-behavior:none;
+}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--amber);outline-offset:4px}
+svg{display:block}
+::selection{background:var(--signal);color:var(--paper)}
+
+#app{position:fixed;inset:0;overflow:hidden;isolation:isolate;background:var(--ink)}
+#scene{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
+.vignette{
+  position:absolute;inset:0;z-index:3;pointer-events:none;
+  box-shadow:inset 0 0 180px rgba(1,8,6,.55), inset 0 -90px 120px rgba(1,8,6,.28);
+}
+.top-scrim{
+  position:absolute;inset:0 0 auto;height:190px;z-index:4;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(3,10,8,.78) 0%,rgba(3,10,8,.34) 46%,transparent 100%);
+}
+.bottom-scrim{
+  position:absolute;inset:auto 0 0;height:210px;z-index:4;pointer-events:none;
+  background:linear-gradient(to top,rgba(3,10,8,.68),transparent 100%);
+}
+#app.is-low-fuel::before{
+  content:"";position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 46%,rgba(140,27,9,.34) 100%);
+  animation:dangerPulse 1.8s ease-in-out infinite;
+}
+@keyframes dangerPulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+[hidden]{display:none!important}
+.is-hidden{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+
+/* ---------- HUD ---------- */
+.hud{
+  position:absolute;inset:0 0 auto;z-index:20;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:18px;
+  padding:calc(18px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px));
+  pointer-events:none;transition:opacity .28s ease,visibility .28s ease;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;filter:drop-shadow(0 1px 8px rgba(0,0,0,.4))}
+.brand-mark{width:30px;height:30px;color:var(--amber);flex:none}
+.brand-copy{display:flex;flex-direction:column;line-height:1;gap:4px;white-space:nowrap}
+.brand-copy strong{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.12em}
+.brand-copy small{font-size:8px;letter-spacing:.28em;color:var(--paper-dim);font-weight:500}
+.distance-block{display:flex;flex-direction:column;align-items:center;text-align:center;filter:drop-shadow(0 2px 10px rgba(0,0,0,.42))}
+.micro{
+  font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--paper-dim);white-space:nowrap;
+}
+.distance-line{display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:1px}
+.distance-value{
+  font-family:var(--display);font-weight:600;font-size:42px;line-height:.95;
+  letter-spacing:.01em;font-variant-numeric:tabular-nums;
+}
+.distance-unit{font-family:var(--mono);font-size:11px;color:var(--paper-dim);letter-spacing:.06em}
+.best-line{margin-top:5px;font-size:8px;color:rgba(244,232,210,.45);letter-spacing:.15em}
+.best-line b{font-weight:500;color:rgba(244,232,210,.72)}
+.hud-right{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:auto;filter:drop-shadow(0 2px 12px rgba(0,0,0,.35))}
+.hud-tools{display:flex;align-items:center;gap:6px}
+.coin-chip{
+  height:34px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border:1px solid var(--line-soft);background:var(--glass);
+  font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.coin-mark{
+  width:13px;height:13px;border-radius:50%;border:1px solid #c58d3e;display:grid;place-items:center;
+  background:radial-gradient(circle at 35% 30%,#ffe4a1,#e7ac4c 55%,#b97528);
+  box-shadow:0 0 10px rgba(240,177,94,.28);
+}
+.coin-mark::after{content:"";width:3px;height:5px;border-radius:50%;background:#7e4c17;opacity:.55}
+#coinValue{display:inline-block;transform-origin:center;font-variant-numeric:tabular-nums}
+#coinValue.is-bumped{animation:coinBump .3s ease-out}
+@keyframes coinBump{0%{transform:scale(1);color:var(--paper)}34%{transform:scale(1.32);color:var(--amber)}100%{transform:scale(1);color:var(--paper)}}
+.icon-btn{
+  width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line-soft);
+  background:var(--glass);color:var(--paper);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:background .18s ease,border-color .18s ease,transform .18s ease;
+}
+.icon-btn:hover{background:rgba(21,45,36,.72);border-color:var(--line);transform:translateY(-1px)}
+.icon-btn:active{transform:translateY(0) scale(.96)}
+.icon-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.mute-slash{opacity:0;transition:opacity .18s ease}
+body.is-muted .mute-slash{opacity:1}
+.pause-icon{display:flex;gap:3px}
+.pause-icon i{display:block;width:2px;height:11px;background:currentColor}
+.fuel-panel{width:168px;padding:9px 10px 8px;border:1px solid var(--line-soft);background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:border-color .2s ease,background .2s ease}
+.fuel-head{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:8px;letter-spacing:.16em;color:var(--paper-dim);text-transform:uppercase}
+.fuel-head b{font-weight:500;color:var(--paper);font-size:9px;font-variant-numeric:tabular-nums}
+.fuel-track{height:5px;margin-top:7px;background:rgba(244,232,210,.13);overflow:hidden;position:relative}
+.fuel-fill{position:absolute;inset:0;transform-origin:left center;background:linear-gradient(90deg,var(--signal),var(--amber));transition:transform .18s linear,background .3s ease}
+.fuel-track::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 16px,rgba(6,16,12,.72) 16px 18px);
+}
+.fuel-panel.is-low{border-color:rgba(235,99,58,.45);background:rgba(50,13,7,.52)}
+.fuel-panel.is-low .fuel-fill{background:var(--signal)}
+
+/* ---------- pedals / speed ---------- */
+.controls{
+  position:absolute;inset:auto 0 0;z-index:30;
+  display:flex;justify-content:space-between;align-items:flex-end;
+  padding:0 max(22px,env(safe-area-inset-right,0px)) calc(22px + env(safe-area-inset-bottom,0px)) max(22px,env(safe-area-inset-left,0px));
+  pointer-events:none;transition:opacity .25s ease,visibility .25s ease;
+}
+.pedal{
+  pointer-events:auto;width:96px;height:96px;border-radius:50%;position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  border:1px solid var(--line);color:var(--paper);touch-action:none;
+  background:
+    radial-gradient(circle at 50% 35%,rgba(43,69,58,.62),rgba(5,15,12,.72) 68%),
+    var(--glass);
+  box-shadow:0 10px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(244,232,210,.08);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  transition:transform .1s ease,background .15s ease,border-color .15s ease,box-shadow .15s ease;
+}
+.pedal::before{
+  content:"";position:absolute;inset:6px;border-radius:50%;border:1px solid rgba(244,232,210,.08);
+}
+.pedal svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.pedal-label{font-size:12px;font-weight:700;letter-spacing:.08em;line-height:1.2}
+.pedal-key{font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:var(--paper-dim);line-height:1.2}
+.pedal--gas{border-color:rgba(240,177,94,.5);color:#fff0d7;background:radial-gradient(circle at 50% 35%,rgba(133,60,31,.58),rgba(29,18,11,.72) 68%);box-shadow:0 10px 34px rgba(0,0,0,.24),0 0 26px rgba(235,99,58,.08),inset 0 1px 0 rgba(255,236,203,.12)}
+.pedal--gas svg{color:var(--amber)}
+.pedal.is-pressed{transform:scale(.94);background:radial-gradient(circle at 50% 40%,rgba(240,177,94,.92),rgba(196,87,44,.88) 72%);border-color:var(--amber);color:var(--ink)}
+.pedal--brake.is-pressed{background:radial-gradient(circle at 50% 40%,rgba(224,216,195,.9),rgba(149,145,127,.88) 72%);border-color:var(--paper);color:var(--ink)}
+.pedal.is-pressed .pedal-key{color:rgba(7,21,17,.6)}
+.pedal.is-pressed svg{opacity:1}
+.speedo{
+  position:absolute;z-index:18;left:50%;bottom:calc(27px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  width:128px;text-align:center;pointer-events:none;filter:drop-shadow(0 2px 10px rgba(0,0,0,.45));
+  transition:opacity .25s ease,visibility .25s ease;
+}
+.speed-label{font-family:var(--mono);font-size:8px;letter-spacing:.24em;color:var(--paper-dim);display:block;margin-bottom:2px}
+.speed-read{display:flex;align-items:baseline;justify-content:center;gap:4px}
+.speed-value{font-family:var(--display);font-size:30px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.speed-unit{font-family:var(--mono);font-size:8px;color:var(--paper-dim);letter-spacing:.08em}
+.speed-track{height:2px;margin-top:7px;background:rgba(244,232,210,.14);overflow:hidden}
+.speed-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--amber),var(--signal));transition:width .16s linear}
+
+/* ---------- toast ---------- */
+.toast{
+  position:absolute;z-index:45;left:50%;top:calc(118px + env(safe-area-inset-top,0px));transform:translate(-50%,-7px);
+  display:flex;align-items:baseline;gap:10px;padding:9px 13px 9px 12px;
+  border-left:2px solid var(--amber);background:rgba(5,15,12,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,transform .22s ease,visibility .22s ease;
+  white-space:nowrap;
+}
+.toast.is-visible{opacity:1;visibility:visible;transform:translate(-50%,0)}
+.toast strong{font-size:11px;font-weight:700;letter-spacing:.06em}
+.toast span{font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:var(--paper-dim)}
+
+/* ---------- intro ---------- */
+.intro{
+  position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;
+  padding:calc(22px + env(safe-area-inset-top,0px)) max(34px,env(safe-area-inset-right,0px)) calc(22px + env(safe-area-inset-bottom,0px)) max(34px,env(safe-area-inset-left,0px));
+  background:
+    radial-gradient(ellipse at 72% 45%,rgba(7,17,14,0) 0%,rgba(7,17,14,.05) 34%,rgba(7,17,14,.36) 70%),
+    radial-gradient(ellipse at 13% 74%,rgba(4,12,9,.8) 0%,rgba(4,12,9,.2) 45%,transparent 68%),
+    linear-gradient(to top,rgba(4,12,9,.94) 0%,rgba(4,12,9,.45) 35%,rgba(4,12,9,.05) 66%,rgba(4,12,9,.2) 100%);
+  transition:opacity .45s ease,visibility .45s ease;
+  overflow:hidden;
+}
+.intro::before{
+  content:"";position:absolute;left:max(34px,env(safe-area-inset-left,0px));right:max(34px,env(safe-area-inset-right,0px));top:52%;height:1px;
+  background:linear-gradient(90deg,rgba(244,232,210,.22),rgba(244,232,210,.03) 50%,transparent);pointer-events:none;
+}
+.intro-top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;position:relative;z-index:1}
+.stamp{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:rgba(244,232,210,.7);text-transform:uppercase}
+.stamp-dot{width:6px;height:6px;border-radius:50%;background:var(--signal);box-shadow:0 0 12px rgba(235,99,58,.7);flex:none}
+.record{text-align:right;line-height:1;filter:drop-shadow(0 2px 10px rgba(0,0,0,.4))}
+.record span{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.18em;color:rgba(244,232,210,.52);text-transform:uppercase;margin-bottom:6px}
+.record strong{font-family:var(--display);font-size:32px;font-weight:600;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.record strong.is-empty{font-size:22px;letter-spacing:.16em;opacity:.58}
+.record.is-empty small{display:none}
+.record small{font-family:var(--mono);font-size:9px;font-weight:400;color:rgba(244,232,210,.5);margin-left:4px;letter-spacing:.06em}
+.intro-main{
+  position:relative;z-index:1;margin-top:auto;padding-top:76px;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,306px);
+  align-items:end;gap:clamp(32px,5vw,90px);
+}
+.intro-copy{max-width:810px}
+.eyebrow{
+  display:flex;align-items:center;gap:10px;margin:0 0 12px;
+  font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.22em;color:var(--amber);text-transform:uppercase;
+}
+.eyebrow::before{content:"";width:26px;height:1px;background:var(--amber);opacity:.75;flex:none}
+.wordmark{
+  position:relative;display:flex;align-items:baseline;flex-wrap:wrap;gap:0;
+  margin:0 0 20px;font-family:var(--sans);font-weight:900;
+  font-size:clamp(68px,10.3vw,146px);line-height:.87;letter-spacing:-.055em;
+  color:var(--paper);text-shadow:0 6px 38px rgba(0,0,0,.36);
+}
+.wordmark .outline{
+  color:transparent;-webkit-text-stroke:1.8px var(--paper);text-stroke:1.8px var(--paper);
+  margin-left:.02em;
+}
+.wordmark-sun{
+  width:clamp(10px,1.2vw,17px);height:clamp(10px,1.2vw,17px);border-radius:50%;
+  background:var(--signal);margin-left:10px;margin-bottom:.58em;flex:none;
+  box-shadow:0 0 24px rgba(235,99,58,.42);
+}
+.lede{
+  max-width:30em;margin:0 0 25px;font-size:14px;font-weight:400;line-height:1.85;
+  letter-spacing:.02em;color:rgba(244,232,210,.68);
+}
+.cta-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.btn-primary{
+  height:52px;padding:0 21px 0 23px;display:inline-flex;align-items:center;gap:22px;
+  background:var(--paper);color:var(--ink);border:1px solid var(--paper);
+  font-size:13px;font-weight:700;letter-spacing:.1em;
+  transition:background .18s ease,color .18s ease,transform .18s ease;
+}
+.btn-primary svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}
+.btn-primary:hover{background:var(--amber);border-color:var(--amber);transform:translateY(-1px)}
+.btn-primary:hover svg{transform:translate(2px,-2px)}
+.btn-primary:active{transform:translateY(0)}
+.btn-ghost{
+  height:50px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);color:var(--paper);font-size:12px;font-weight:500;letter-spacing:.08em;
+  transition:background .18s ease,border-color .18s ease;
+}
+.btn-ghost:hover{background:rgba(244,232,210,.07);border-color:rgba(244,232,210,.4)}
+.press-hint{font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:rgba(244,232,210,.38);white-space:nowrap}
+.mobile-note{display:none;margin:13px 0 0;font-family:var(--mono);font-size:8px;line-height:1.5;letter-spacing:.1em;color:rgba(244,232,210,.36)}
+.drive-card{
+  border-top:1px solid var(--line);padding-top:13px;
+  filter:drop-shadow(0 2px 14px rgba(0,0,0,.25));
+}
+.drive-card-head{display:flex;justify-content:space-between;gap:16px;font-family:var(--mono);font-size:8px;letter-spacing:.18em;color:rgba(244,232,210,.56);text-transform:uppercase;padding-bottom:10px;border-bottom:1px solid var(--line-soft)}
+.drive-card-head span:last-child{color:var(--amber)}
+.drive-row{display:grid;grid-template-columns:86px 1fr;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(244,232,210,.07);font-size:11px;color:rgba(244,232,210,.72)}
+.keys{display:flex;align-items:center;gap:4px}
+kbd{
+  min-width:23px;height:22px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid rgba(244,232,210,.24);background:rgba(5,15,12,.32);
+  font-family:var(--mono);font-size:9px;color:var(--paper);line-height:1;
+}
+.drive-note{margin:11px 0 0;font-size:10px;line-height:1.75;color:rgba(244,232,210,.42)}
+.intro-foot{
+  position:relative;z-index:1;display:flex;justify-content:space-between;gap:24px;
+  border-top:1px solid rgba(244,232,210,.11);margin-top:20px;padding-top:10px;
+  font-family:var(--mono);font-size:8px;letter-spacing:.15em;color:rgba(244,232,210,.32);text-transform:uppercase;
+}
+
+/* ---------- modals ---------- */
+.screen{
+  position:absolute;inset:0;z-index:60;display:grid;place-items:center;
+  padding:max(24px,env(safe-area-inset-top,0px)) max(22px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(22px,env(safe-area-inset-left,0px));
+  background:rgba(3,10,8,.66);backdrop-filter:blur(14px) saturate(.75);-webkit-backdrop-filter:blur(14px) saturate(.75);
+  transition:opacity .28s ease,visibility .28s ease;
+}
+.modal{width:min(560px,100%);border-top:1px solid var(--line);padding-top:22px;filter:drop-shadow(0 10px 38px rgba(0,0,0,.28))}
+.modal .eyebrow{margin-bottom:10px}
+.modal h2{
+  margin:0 0 12px;font-family:var(--sans);font-size:clamp(42px,6.6vw,78px);
+  font-weight:900;line-height:.98;letter-spacing:-.045em;color:var(--paper);
+}
+.modal-copy{margin:0 0 22px;font-size:12px;line-height:1.8;color:rgba(244,232,210,.58);max-width:35em}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);margin:20px 0 0}
+.stat{padding:13px 12px 14px;border-left:1px solid var(--line-soft);min-width:0}
+.stat:first-child{border-left:0;padding-left:0}
+.stat span{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.15em;color:rgba(244,232,210,.46);text-transform:uppercase;white-space:nowrap}
+.stat strong{display:block;margin-top:5px;font-family:var(--display);font-size:27px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat small{font-family:var(--mono);font-size:8px;font-weight:400;color:rgba(244,232,210,.42);margin-left:3px;letter-spacing:.04em}
+.modal-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:22px}
+.modal-actions .btn-primary{height:50px;letter-spacing:.08em}
+.modal-actions .btn-ghost{height:48px}
+.record-note{
+  margin-top:16px;display:flex;align-items:center;gap:9px;
+  font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase;
+}
+.record-note::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--signal);box-shadow:0 0 10px rgba(235,99,58,.7)}
+.modal-mini{display:flex;align-items:center;gap:9px;margin-top:18px;font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:rgba(244,232,210,.36)}
+.sound-text{color:rgba(244,232,210,.52)}
+.sound-text:hover{color:var(--paper)}
+
+@media (max-width:760px){
+  .intro{padding:calc(18px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
+  .intro::before{left:max(18px,env(safe-area-inset-left,0px));right:max(18px,env(safe-area-inset-right,0px))}
+  .intro-main{grid-template-columns:1fr;gap:0;padding-top:64px}
+  .drive-card{display:none}
+  .wordmark{font-size:clamp(58px,16.2vw,108px);margin-bottom:16px;letter-spacing:-.06em}
+  .wordmark .outline{-webkit-text-stroke-width:1.4px;text-stroke-width:1.4px}
+  .lede{font-size:12px;line-height:1.8;margin-bottom:20px;max-width:24em}
+  .intro-foot{margin-top:16px;font-size:7px}
+  .press-hint{display:none}
+  .mobile-note{display:block}
+  .btn-primary{height:50px;font-size:12px;gap:18px}
+  .intro-top .stamp{font-size:8px;letter-spacing:.12em}
+  .record strong{font-size:27px}
+  .hud{padding:calc(13px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 0 max(14px,env(safe-area-inset-left,0px));gap:8px}
+  .brand{display:none}
+  .hud{grid-template-columns:1fr auto}
+  .distance-block{justify-self:start;align-items:flex-start;text-align:left}
+  .distance-value{font-size:33px}
+  .best-line{font-size:7px}
+  .hud-right{gap:7px}
+  .hud-tools{gap:5px}
+  .coin-chip{height:38px;padding:0 9px;font-size:10px}
+  .icon-btn{width:38px;height:38px}
+  .fuel-panel{width:137px;padding:7px 8px}
+  .controls{padding:0 max(16px,env(safe-area-inset-right,0px)) calc(15px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+  .pedal{width:78px;height:78px;gap:1px}
+  .pedal svg{width:18px;height:18px}
+  .pedal-label{font-size:11px}
+  .pedal-key{display:none}
+  .speedo{bottom:calc(16px + env(safe-area-inset-bottom,0px));width:96px}
+  .speed-value{font-size:23px}
+  .speed-label{font-size:7px}
+  .toast{top:calc(103px + env(safe-area-inset-top,0px));padding:8px 11px;max-width:calc(100vw - 32px);white-space:normal}
+  .toast strong{font-size:10px}
+  .toast span{font-size:7px}
+  .modal h2{font-size:clamp(38px,12vw,58px)}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .stat{padding:11px 8px 12px}
+  .stat strong{font-size:23px}
+  .stat span{font-size:7px;letter-spacing:.08em}
+  .modal-copy{font-size:11px}
+  .modal-actions .btn-primary{flex:1 1 160px}
+  .modal-actions .btn-ghost{flex:1 1 120px}
+  .screen{padding-top:calc(22px + env(safe-area-inset-top,0px));padding-bottom:calc(22px + env(safe-area-inset-bottom,0px))}
+}
+@media (max-height:620px){
+  .intro{padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .intro::before{display:none}
+  .intro-main{grid-template-columns:1fr;gap:0;padding-top:14px}
+  .intro-copy{max-width:min(640px,78vw)}
+  .eyebrow{margin-bottom:6px}
+  .wordmark{font-size:clamp(48px,7.2vw,86px);margin-bottom:8px;line-height:.84}
+  .wordmark-sun{width:9px;height:9px;margin-left:7px}
+  .lede{font-size:11px;line-height:1.55;margin-bottom:12px;max-width:26em}
+  .cta-row{gap:14px}
+  .btn-primary{height:42px;padding:0 16px;font-size:11px;gap:15px}
+  .press-hint{display:none}
+  .mobile-note{display:block;margin-top:10px}
+  .drive-card{display:none}
+  .intro-foot{display:none}
+  .record span{font-size:7px;margin-bottom:3px}
+  .record strong{font-size:21px}
+  .stamp{font-size:7px;letter-spacing:.12em}
+  .modal{padding-top:14px}
+  .modal .eyebrow{margin-bottom:6px}
+  .modal h2{font-size:clamp(32px,6.2vw,50px);margin-bottom:8px}
+  .modal-copy{display:none}
+  .stats{margin-top:12px}
+  .stat{padding:8px 10px 9px}
+  .stat strong{font-size:21px}
+  .modal-actions{margin-top:14px}
+  .modal-actions .btn-primary,.modal-actions .btn-ghost{height:42px}
+  .modal-mini{margin-top:10px}
+  .record-note{margin-top:10px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene" aria-label="山脊冲刺游戏场景"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="top-scrim" aria-hidden="true"></div>
+  <div class="bottom-scrim" aria-hidden="true"></div>
+
+  <header class="hud is-hidden" id="hud" aria-label="行车信息">
+    <div class="brand" aria-hidden="true">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none">
+        <path d="M3 24.5 12.7 7l4.5 8.1L21.3 7 29 24.5H3Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        <path d="M12.1 24.5 16.8 16l4.8 8.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" opacity=".48"/>
+      </svg>
+      <span class="brand-copy"><strong>RIDGE RUN</strong><small>山脊冲刺</small></span>
+    </div>
+
+    <div class="distance-block">
+      <span class="micro">已行进</span>
+      <div class="distance-line"><span class="distance-value" id="distanceValue">0</span><span class="distance-unit">m</span></div>
+      <span class="best-line">最佳 <b id="bestHud">0</b> m</span>
+    </div>
+
+    <div class="hud-right">
+      <div class="hud-tools">
+        <div class="coin-chip" title="本程金币"><span class="coin-mark" aria-hidden="true"></span><span id="coinValue">0</span></div>
+        <button class="icon-btn" id="muteBtn" type="button" aria-label="静音" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9.5h3.4L12 5.7v12.6l-4.6-3.8H4z"/>
+            <path d="M15.6 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/>
+            <path class="mute-slash" d="m5 5 14 14"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="pauseBtn" type="button" aria-label="暂停游戏">
+          <span class="pause-icon" aria-hidden="true"><i></i><i></i></span>
+        </button>
+      </div>
+      <div class="fuel-panel" id="fuelPanel">
+        <div class="fuel-head"><span>燃油</span><b id="fuelValue">100%</b></div>
+        <div class="fuel-track" id="fuelTrack" role="progressbar" aria-label="燃油" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><div class="fuel-fill" id="fuelFill"></div></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="speedo is-hidden" id="speedo" aria-hidden="true">
+    <span class="speed-label">SPEED</span>
+    <div class="speed-read"><span class="speed-value" id="speedValue">0</span><span class="speed-unit">KM/H</span></div>
+    <div class="speed-track"><div class="speed-fill" id="speedFill"></div></div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"><strong id="toastMain"></strong><span id="toastDetail"></span></div>
+
+  <div class="controls is-hidden" id="controls" aria-label="驾驶控制">
+    <button class="pedal pedal--brake" id="brakeBtn" type="button" aria-label="刹车或倒车">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>
+      <span class="pedal-label">刹车</span>
+      <span class="pedal-key">A / ←</span>
+    </button>
+    <button class="pedal pedal--gas" id="gasBtn" type="button" aria-label="油门">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      <span class="pedal-label">油门</span>
+      <span class="pedal-key">D / →</span>
+    </button>
+  </div>
+
+  <section class="intro" id="intro" aria-labelledby="gameTitle">
+    <div class="intro-top">
+      <div class="stamp"><span class="stamp-dot" aria-hidden="true"></span><span>阿尔卑斯试炼道 · 无尽赛段</span></div>
+      <div class="record is-empty"><span>个人最佳距离</span><strong id="introBest" class="is-empty">尚无</strong><small>M</small></div>
+    </div>
+
+    <div class="intro-main">
+      <div class="intro-copy">
+        <p class="eyebrow">Ridge Run · Stage ∞</p>
+        <h1 class="wordmark" id="gameTitle">山脊<span class="outline">冲刺</span><span class="wordmark-sun" aria-hidden="true"></span></h1>
+        <p class="lede">把油门踩进晨雾里。越过山脊、稳住车身，<br>在燃油见底之前，抵达更远的山峰。</p>
+        <div class="cta-row">
+          <button class="btn-primary" id="startBtn" type="button">点火出发
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M9 6h9v9"/></svg>
+          </button>
+          <span class="press-hint">按 ENTER 开始</span>
+        </div>
+        <p class="mobile-note">右侧油门 · 左侧刹车 · 腾空时用两只踏板控姿</p>
+      </div>
+
+      <aside class="drive-card" aria-label="操作说明">
+        <div class="drive-card-head"><span>驾驶手册</span><span>NO. 01</span></div>
+        <div class="drive-row"><span class="keys"><kbd>A</kbd><kbd>←</kbd></span><span>刹车 / 倒车</span></div>
+        <div class="drive-row"><span class="keys"><kbd>D</kbd><kbd>→</kbd></span><span>油门</span></div>
+        <div class="drive-row"><span class="keys"><kbd>P</kbd><kbd>M</kbd></span><span>暂停 / 静音</span></div>
+        <p class="drive-note">触屏使用两侧踏板。腾空时，油门抬车头，刹车压车头；收集油桶，别让油表先归零。</p>
+      </aside>
+    </div>
+
+    <div class="intro-foot">
+      <span>RIDGE RUN / 纯前端无尽爬坡</span>
+      <span>NO BACKEND · JUST GRAVITY</span>
+    </div>
+  </section>
+
+  <section class="screen is-hidden" id="pauseOverlay" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" aria-hidden="true" inert>
+    <div class="modal">
+      <p class="eyebrow">Stage paused</p>
+      <h2 id="pauseTitle">停在山脊上</h2>
+      <p class="modal-copy">风还在吹，油还在油箱里。继续向上，或者从起点重新出发。</p>
+      <div class="stats">
+        <div class="stat"><span>当前距离</span><strong id="pauseDistance">0<small>m</small></strong></div>
+        <div class="stat"><span>金币</span><strong id="pauseCoins">0</strong></div>
+        <div class="stat"><span>燃油</span><strong id="pauseFuel">100<small>%</small></strong></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="resumeBtn" type="button">继续爬坡
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <button class="btn-ghost" id="pauseRestartBtn" type="button">重新开始</button>
+        <button class="sound-text btn-ghost" id="pauseMuteBtn" type="button">声音：开</button>
+      </div>
+      <div class="modal-mini"><span>P</span><span>继续 / 暂停</span><span>·</span><span>R</span><span>回到赛道</span></div>
+    </div>
+  </section>
+
+  <section class="screen is-hidden" id="overOverlay" role="dialog" aria-modal="true" aria-labelledby="overTitle" aria-hidden="true" inert>
+    <div class="modal">
+      <p class="eyebrow">Run complete</p>
+      <h2 id="overTitle">油箱见底</h2>
+      <p class="modal-copy" id="overCopy">山脊替你收下了这一程。下一次，把发车点甩得更远。</p>
+      <div class="record-note" id="newRecord" hidden>新的个人纪录</div>
+      <div class="stats">
+        <div class="stat"><span>本次距离</span><strong id="resultDistance">0<small>m</small></strong></div>
+        <div class="stat"><span>金币</span><strong id="resultCoins">0</strong></div>
+        <div class="stat"><span>个人最佳</span><strong id="resultBest">0<small>m</small></strong></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="againBtn" type="button">再跑一程
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M9 6h9v9"/></svg>
+        </button>
+        <button class="btn-ghost" id="homeBtn" type="button">回到起点</button>
+      </div>
+    </div>
+  </section>
+
+  <noscript><div style="position:absolute;inset:0;display:grid;place-items:center;background:#071511;color:#f4e8d2;font-family:sans-serif;z-index:99">这个游戏需要启用 JavaScript。</div></noscript>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("scene");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const app = document.getElementById("app");
+
+  const el = {
+    hud: document.getElementById("hud"),
+    distance: document.getElementById("distanceValue"),
+    bestHud: document.getElementById("bestHud"),
+    coins: document.getElementById("coinValue"),
+    fuelPanel: document.getElementById("fuelPanel"),
+    fuelFill: document.getElementById("fuelFill"),
+    fuelValue: document.getElementById("fuelValue"),
+    fuelTrack: document.getElementById("fuelTrack"),
+    speedo: document.getElementById("speedo"),
+    speedValue: document.getElementById("speedValue"),
+    speedFill: document.getElementById("speedFill"),
+    controls: document.getElementById("controls"),
+    gasBtn: document.getElementById("gasBtn"),
+    brakeBtn: document.getElementById("brakeBtn"),
+    muteBtn: document.getElementById("muteBtn"),
+    pauseBtn: document.getElementById("pauseBtn"),
+    toast: document.getElementById("toast"),
+    toastMain: document.getElementById("toastMain"),
+    toastDetail: document.getElementById("toastDetail"),
+    intro: document.getElementById("intro"),
+    introBest: document.getElementById("introBest"),
+    startBtn: document.getElementById("startBtn"),
+    pauseOverlay: document.getElementById("pauseOverlay"),
+    pauseDistance: document.getElementById("pauseDistance"),
+    pauseCoins: document.getElementById("pauseCoins"),
+    pauseFuel: document.getElementById("pauseFuel"),
+    resumeBtn: document.getElementById("resumeBtn"),
+    pauseRestartBtn: document.getElementById("pauseRestartBtn"),
+    pauseMuteBtn: document.getElementById("pauseMuteBtn"),
+    overOverlay: document.getElementById("overOverlay"),
+    overTitle: document.getElementById("overTitle"),
+    overCopy: document.getElementById("overCopy"),
+    resultDistance: document.getElementById("resultDistance"),
+    resultCoins: document.getElementById("resultCoins"),
+    resultBest: document.getElementById("resultBest"),
+    newRecord: document.getElementById("newRecord"),
+    againBtn: document.getElementById("againBtn"),
+    homeBtn: document.getElementById("homeBtn"),
+  };
+
+  const TAU = Math.PI * 2;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smoothstep = (a, b, x) => {
+    const t = clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+  const hash = (n) => {
+    const x = Math.sin(n * 127.1 + 311.7) * 43758.5453123;
+    return x - Math.floor(x);
+  };
+  const mulberry32 = (seed) => {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+
+  const START_X = 6;
+  const CHUNK = 44;
+  const GOAL_STEP = 1 / 120;
+  const WHEEL_RADIUS = 0.46;
+  const CAR_MASS = 150;
+  const CAR_INERTIA = 152;
+  const GRAVITY = 10.2;
+  const SPRING = 29000;
+  const DAMPER = 1650;
+  const ENGINE = 1760;
+  const BRAKE = 2550;
+  const SAVE_KEY = "ridge-run-v1";
+
+  let W = 1, H = 1, DPR = 1, baseScale = 30;
+  const camera = { x: START_X, y: 0, scale: 30 };
+  const view = { x: START_X, y: 0, scale: 30 };
+  let shake = 0;
+  let elapsed = 0;
+  let state = "intro";
+  let accumulator = 0;
+  let lastFrame = 0;
+  let lastHud = { distance: -1, best: -1, coins: -1, fuel: -1, speed: -1 };
+  let toastTimer = 0;
+  let save = loadSave();
+  let muted = !!save.muted;
+
+
+  const keys = Object.create(null);
+  const touch = { gas: false, brake: false };
+
+  const car = {
+    x: START_X,
+    y: 0,
+    angle: 0,
+    vx: 0,
+    vy: 0,
+    omega: 0,
+    wheelSpin: [0, 0],
+    contact: [false, false],
+    wheelWorld: [{ x: 0, y: 0 }, { x: 0, y: 0 }],
+    contactCount: 0,
+    maxX: START_X,
+    crashed: false,
+    crashTimer: 0,
+  };
+
+  let fuel = 100;
+  let coins = 0;
+  let distance = 0;
+  let emptyTimer = 0;
+  let emptyWarned = false;
+  let lowFuelWarned = false;
+  let stuckTimer = 0;
+  let exhaustTimer = 0;
+  let contactWasAir = true;
+  let chunkCursor = 0;
+  let items = [];
+  let particles = [];
+
+  const audio = {
+    ctx: null,
+    master: null,
+    engineGain: null,
+    filter: null,
+    oscA: null,
+    oscB: null,
+    ready: false,
+  };
+
+  /* ---------- persistence ---------- */
+  function loadSave() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return {
+        best: Math.max(0, Number(parsed.best) || 0),
+        muted: !!parsed.muted,
+      };
+    } catch (_) {
+      return { best: 0, muted: false };
+    }
+  }
+  function persist() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ best: save.best, muted }));
+    } catch (_) {}
+  }
+
+  /* ---------- terrain ---------- */
+  function heightAt(x) {
+    const d = x - START_X;
+    const ramp = smoothstep(7, 43, d);
+    const difficulty = 0.82 + Math.min(Math.max(d, 0) / 2200, 1) * 0.38;
+    const base =
+      5.6 * Math.sin(x * 0.029 + 0.55) +
+      2.7 * Math.sin(x * 0.073 + 2.1) +
+      1.05 * Math.sin(x * 0.172 + 1.35);
+    return base * ramp * difficulty;
+  }
+  function slopeAt(x) {
+    const h = 0.18;
+    return (heightAt(x + h) - heightAt(x - h)) / (h * 2);
+  }
+
+  /* ---------- canvas sizing / camera ---------- */
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.floor(W * DPR));
+    canvas.height = Math.max(1, Math.floor(H * DPR));
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    baseScale = clamp(W / 46, 16, 38);
+    if (state === "intro") {
+      camera.scale = baseScale * 1.015;
+    }
+  }
+
+  function targetCamera() {
+    const visW = W / camera.scale;
+    const visH = H / camera.scale;
+    if (state === "intro") {
+      return {
+        x: car.x - visW * 0.18,
+        y: car.y - visH * 0.15,
+        scale: baseScale * 1.015,
+      };
+    }
+    const look = clamp(car.vx * 0.4, -visW * 0.17, visW * 0.22);
+    const speedZoom = 1 - clamp(Math.abs(car.vx) / 92, 0, 0.1);
+    return {
+      x: car.x + look,
+      y: car.y - visH * 0.13,
+      scale: baseScale * speedZoom,
+    };
+  }
+
+  function updateCamera(dt) {
+    const target = targetCamera();
+    const posK = 1 - Math.exp(-dt * (state === "intro" ? 1.25 : 4.4));
+    const scaleK = 1 - Math.exp(-dt * 2.3);
+    camera.x = lerp(camera.x, target.x, posK);
+    camera.y = lerp(camera.y, target.y, posK);
+    camera.scale = lerp(camera.scale, target.scale, scaleK);
+    shake *= Math.exp(-dt * 6.5);
+    if (shake < 0.001) shake = 0;
+  }
+
+  function snapCamera() {
+    const target = targetCamera();
+    camera.x = target.x;
+    camera.y = target.y;
+    camera.scale = target.scale;
+  }
+
+  function makeView() {
+    const t = performance.now() / 1000;
+    view.x = camera.x + (Math.sin(t * 137) * shake * 6.5) / camera.scale;
+    view.y = camera.y + (Math.cos(t * 107) * shake * 4.5) / camera.scale;
+    view.scale = camera.scale;
+  }
+  const toScreenX = (x) => W * 0.5 + (x - view.x) * view.scale;
+  const toScreenY = (y) => H * 0.5 + (y - view.y) * view.scale;
+
+  /* ---------- audio ---------- */
+  function initAudio() {
+    if (audio.ready) {
+      if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
+      return;
+    }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      const ac = new AC();
+      const master = ac.createGain();
+      master.gain.value = muted ? 0 : 0.7;
+      master.connect(ac.destination);
+
+      const engineGain = ac.createGain();
+      engineGain.gain.value = 0;
+      const filter = ac.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 280;
+      filter.Q.value = 1.2;
+      const oscA = ac.createOscillator();
+      const oscB = ac.createOscillator();
+      oscA.type = "sawtooth";
+      oscB.type = "square";
+      oscA.frequency.value = 48;
+      oscB.frequency.value = 24;
+      const bGain = ac.createGain();
+      bGain.gain.value = 0.18;
+      oscA.connect(filter);
+      oscB.connect(bGain);
+      bGain.connect(filter);
+      filter.connect(engineGain);
+      engineGain.connect(master);
+      oscA.start();
+      oscB.start();
+
+      audio.ctx = ac;
+      audio.master = master;
+      audio.engineGain = engineGain;
+      audio.filter = filter;
+      audio.oscA = oscA;
+      audio.oscB = oscB;
+      audio.ready = true;
+      if (ac.state === "suspended") ac.resume();
+      updateSoundButtons();
+    } catch (_) {}
+  }
+
+  function setMuted(next) {
+    muted = !!next;
+    if (audio.master) {
+      const t = audio.ctx.currentTime;
+      audio.master.gain.setTargetAtTime(muted ? 0 : 0.7, t, 0.03);
+    }
+    document.body.classList.toggle("is-muted", muted);
+    persist();
+    updateSoundButtons();
+  }
+
+  function updateSoundButtons() {
+    const label = muted ? "取消静音" : "静音";
+    el.muteBtn.setAttribute("aria-label", label);
+    el.muteBtn.setAttribute("aria-pressed", muted ? "true" : "false");
+    el.pauseMuteBtn.textContent = muted ? "声音：关" : "声音：开";
+  }
+
+  function chime(freq, duration, type, volume, slide) {
+    if (!audio.ready || muted || !audio.ctx) return;
+    const ac = audio.ctx;
+    const now = ac.currentTime;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = type || "sine";
+    osc.frequency.setValueAtTime(freq, now);
+    if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(24, slide), now + duration);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume || 0.04), now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.connect(gain);
+    gain.connect(audio.master);
+    osc.start(now);
+    osc.stop(now + duration + 0.03);
+  }
+
+  function pickupSound(kind) {
+    if (kind === "fuel") {
+      chime(392, 0.16, "triangle", 0.05);
+      setTimeout(() => chime(587, 0.22, "triangle", 0.045), 90);
+    } else {
+      const note = 620 + ((coins % 5) * 75);
+      chime(note, 0.09, "triangle", 0.026);
+    }
+  }
+
+  function crashSound() {
+    chime(132, 0.4, "sawtooth", 0.055, 44);
+    chime(82, 0.55, "triangle", 0.04, 32);
+  }
+
+  function updateAudio() {
+    if (!audio.ready) return;
+    const ac = audio.ctx;
+    const t = ac.currentTime;
+    const active = state === "playing" && !car.crashed;
+    const gasHeld = readGas();
+    const speed = Math.abs(car.vx);
+    if (active) {
+      const base = 39 + Math.min(speed * 4.1, 108) + (gasHeld ? 18 : 0);
+      audio.oscA.frequency.setTargetAtTime(base, t, 0.08);
+      audio.oscB.frequency.setTargetAtTime(base * 0.5, t, 0.08);
+      audio.filter.frequency.setTargetAtTime(210 + speed * 32 + (gasHeld ? 170 : 0), t, 0.08);
+      const target = 0.012 + (gasHeld ? 0.028 : 0.006) + Math.min(speed * 0.0007, 0.012);
+      audio.engineGain.gain.setTargetAtTime(target, t, 0.12);
+    } else {
+      audio.engineGain.gain.setTargetAtTime(0.0001, t, 0.12);
+    }
+  }
+
+  /* ---------- input ---------- */
+  function readGas() {
+    return !!(keys.ArrowRight || keys.KeyD || keys.Space || touch.gas);
+  }
+  function readBrake() {
+    return !!(keys.ArrowLeft || keys.KeyA || touch.brake);
+  }
+
+  function clearPressed() {
+    touch.gas = false;
+    touch.brake = false;
+    el.gasBtn.classList.remove("is-pressed");
+    el.brakeBtn.classList.remove("is-pressed");
+  }
+
+  function bindPedal(button, name) {
+    const press = (e) => {
+      e.preventDefault();
+      initAudio();
+      touch[name] = true;
+      button.classList.add("is-pressed");
+      try { button.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+    const release = (e) => {
+      touch[name] = false;
+      button.classList.remove("is-pressed");
+      if (e && e.pointerId != null) {
+        try { button.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+    button.addEventListener("pointerdown", press);
+    button.addEventListener("pointerup", release);
+    button.addEventListener("pointercancel", release);
+    button.addEventListener("lostpointercapture", release);
+    button.addEventListener("contextmenu", (e) => e.preventDefault());
+  }
+  bindPedal(el.gasBtn, "gas");
+  bindPedal(el.brakeBtn, "brake");
+
+  /* ---------- run setup ---------- */
+  function resetCar() {
+    const gy = heightAt(START_X);
+    car.x = START_X;
+    car.y = gy - 0.83;
+    car.angle = Math.atan(slopeAt(START_X));
+    car.vx = 0;
+    car.vy = 0;
+    car.omega = 0;
+    car.wheelSpin[0] = 0;
+    car.wheelSpin[1] = 0;
+    car.contact[0] = false;
+    car.contact[1] = false;
+    car.contactCount = 0;
+    car.maxX = START_X;
+    car.crashed = false;
+    car.crashTimer = 0;
+    const c = Math.cos(car.angle);
+    const s = Math.sin(car.angle);
+    car.wheelWorld[0].x = car.x - 1.08 * c - 0.34 * s;
+    car.wheelWorld[0].y = car.y - 1.08 * s + 0.34 * c;
+    car.wheelWorld[1].x = car.x + 1.08 * c - 0.34 * s;
+    car.wheelWorld[1].y = car.y + 1.08 * s + 0.34 * c;
+  }
+
+  function generateChunk(c) {
+    const rng = mulberry32((c + 7) * 0x9e3779b1);
+    const baseX = START_X + c * CHUNK;
+
+    // A coin ribbon every other chunk keeps the line readable and rewarding.
+    if (c % 2 === 1) {
+      const count = 3 + Math.floor(rng() * 3);
+      const start = baseX + 7 + rng() * 15;
+      const lift = 1.08 + rng() * 0.5;
+      for (let i = 0; i < count; i++) {
+        const x = start + i * 3.15;
+        const arc = Math.sin((i / Math.max(1, count - 1)) * Math.PI) * 1.55;
+        items.push({
+          type: "coin",
+          x,
+          y: heightAt(x) - lift - arc,
+          phase: rng() * TAU,
+          alive: true,
+        });
+      }
+    }
+
+    // Fuel is deliberately generous enough to reward a clean line.
+    if (c === 1 || (c > 3 && c % 4 === 1)) {
+      const x = baseX + 13 + rng() * 17;
+      items.push({
+        type: "fuel",
+        x,
+        y: heightAt(x) - 1.15,
+        phase: rng() * TAU,
+        alive: true,
+      });
+    }
+  }
+
+  function ensureChunksAhead() {
+    const target = car.x + 310;
+    while (START_X + chunkCursor * CHUNK < target) {
+      generateChunk(chunkCursor);
+      chunkCursor++;
+    }
+    if (items.length > 500) {
+      items = items.filter((it) => it.alive && it.x > car.x - 55);
+    }
+  }
+
+  function resetRun() {
+    fuel = 100;
+    coins = 0;
+    distance = 0;
+    emptyTimer = 0;
+    emptyWarned = false;
+    lowFuelWarned = false;
+    stuckTimer = 0;
+    exhaustTimer = 0;
+    contactWasAir = true;
+    items = [];
+    particles = [];
+    chunkCursor = 0;
+    resetCar();
+    ensureChunksAhead();
+    lastHud = { distance: -1, best: -1, coins: -1, fuel: -1, speed: -1 };
+    updateHud(true);
+  }
+
+  /* ---------- game state ---------- */
+  function startRun() {
+    initAudio();
+    if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
+    closeOverlay(el.intro);
+    closeOverlay(el.pauseOverlay);
+    closeOverlay(el.overOverlay);
+    resetRun();
+    state = "playing";
+    clearPressed();
+    accumulator = 0;
+    el.hud.inert = false;
+    el.hud.classList.remove("is-hidden");
+    el.controls.classList.remove("is-hidden");
+    el.speedo.classList.remove("is-hidden");
+    el.pauseBtn.disabled = false;
+    el.intro.setAttribute("aria-hidden", "true");
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    showToast("发车", "按住油门，向山脊进发");
+  }
+
+  function pauseGame() {
+    if (state !== "playing") return;
+    state = "paused";
+    clearPressed();
+    el.hud.inert = true;
+    el.controls.classList.add("is-hidden");
+    el.speedo.classList.add("is-hidden");
+    el.pauseDistance.innerHTML = Math.floor(distance) + "<small>m</small>";
+    el.pauseCoins.textContent = String(coins);
+    el.pauseFuel.innerHTML = Math.ceil(fuel) + "<small>%</small>";
+    openOverlay(el.pauseOverlay, el.resumeBtn);
+  }
+
+  function resumeGame() {
+    if (state !== "paused") return;
+    state = "playing";
+    closeOverlay(el.pauseOverlay);
+    el.hud.inert = false;
+    el.controls.classList.remove("is-hidden");
+    el.speedo.classList.remove("is-hidden");
+    accumulator = 0;
+    initAudio();
+  }
+
+  function endRun() {
+    if (state !== "playing") return;
+    const finalDistance = Math.floor(distance);
+    const record = finalDistance > save.best;
+    if (record) save.best = finalDistance;
+    persist();
+    state = "over";
+    clearPressed();
+    el.hud.inert = true;
+    el.controls.classList.add("is-hidden");
+    el.speedo.classList.add("is-hidden");
+    updateBestUi();
+    el.resultDistance.innerHTML = finalDistance + "<small>m</small>";
+    el.resultCoins.textContent = String(coins);
+    el.resultBest.innerHTML = save.best + "<small>m</small>";
+    el.overTitle.textContent = fuel <= 0 ? "油箱见底" : "赛段结束";
+    el.overCopy.textContent = record
+      ? "山脊替你记下了这一程。新的个人纪录，已经在路上。"
+      : "山脊替你收下了这一程。下一次，把发车点甩得更远。";
+    el.newRecord.hidden = !record;
+    openOverlay(el.overOverlay, el.againBtn);
+    updateHud(true);
+  }
+
+  function goHome() {
+    state = "intro";
+    clearPressed();
+    closeOverlay(el.pauseOverlay);
+    closeOverlay(el.overOverlay);
+    el.hud.inert = false;
+    el.controls.classList.add("is-hidden");
+    el.speedo.classList.add("is-hidden");
+    el.hud.classList.add("is-hidden");
+    updateBestUi();
+    el.intro.setAttribute("aria-hidden", "false");
+    openOverlay(el.intro);
+    resetRun();
+    snapCamera();
+  }
+
+  function respawn(auto) {
+    const targetX = Math.max(START_X + 3, car.maxX - 7);
+    car.x = targetX;
+    car.y = heightAt(targetX) - 1.12;
+    car.angle = Math.atan(slopeAt(targetX));
+    car.vx = 0;
+    car.vy = 0;
+    car.omega = 0;
+    car.crashed = false;
+    car.crashTimer = 0;
+    car.contactCount = 0;
+    stuckTimer = 0;
+    emptyTimer = 0;
+    contactWasAir = true;
+    addShake(0.45);
+    showToast(auto ? "回到山脊" : "回到赛道", "距离保留，继续向上");
+  }
+
+  /* ---------- particles ---------- */
+  function addParticle(p) {
+    if (particles.length > 340) particles.shift();
+    particles.push(p);
+  }
+
+  function spawnDust(x, y, dir) {
+    addParticle({
+      type: "dust",
+      x,
+      y,
+      vx: dir * (0.4 + Math.random() * 2.1) - car.vx * 0.06,
+      vy: -0.1 - Math.random() * 0.6,
+      life: 0.4 + Math.random() * 0.55,
+      maxLife: 0.95,
+      size: 0.11 + Math.random() * 0.25,
+    });
+  }
+
+  function spawnExhaust() {
+    const c = Math.cos(car.angle), s = Math.sin(car.angle);
+    const lx = -1.48, ly = 0.24;
+    const x = car.x + lx * c - ly * s;
+    const y = car.y + lx * s + ly * c;
+    addParticle({
+      type: "smoke",
+      x,
+      y,
+      vx: -1.1 + Math.random() * 0.6 - car.vx * 0.1,
+      vy: -0.35 - Math.random() * 0.3,
+      life: 0.5 + Math.random() * 0.55,
+      maxLife: 1.05,
+      size: 0.07 + Math.random() * 0.13,
+    });
+  }
+
+  function spawnPickup(x, y, color) {
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * TAU;
+      const sp = 0.9 + Math.random() * 2.5;
+      addParticle({
+        type: "spark",
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 0.8,
+        life: 0.35 + Math.random() * 0.4,
+        maxLife: 0.75,
+        size: 0.045 + Math.random() * 0.06,
+        color: color || "#f4c76d",
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+      p.vy += (p.type === "dust" ? 1.4 : p.type === "smoke" ? -0.18 : 5.2) * dt;
+      p.vx *= Math.exp(-0.7 * dt);
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+  }
+
+  /* ---------- items / fuel ---------- */
+  function collectItem(item) {
+    if (item.type === "coin") {
+      coins++;
+      pickupSound("coin");
+      spawnPickup(item.x, item.y, "#f4c76d");
+      item.alive = false;
+      el.coins.classList.remove("is-bumped");
+      void el.coins.offsetWidth;
+      el.coins.classList.add("is-bumped");
+    } else {
+      fuel = Math.min(100, fuel + 34);
+      emptyTimer = 0;
+      emptyWarned = false;
+      lowFuelWarned = false;
+      pickupSound("fuel");
+      spawnPickup(item.x, item.y, "#ffd08a");
+      showToast("燃油 +34", "继续向山脊深处");
+      item.alive = false;
+    }
+  }
+
+  function updateItems() {
+    let pruned = false;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.alive) {
+        pruned = true;
+        continue;
+      }
+      if (item.x < car.x - 60) {
+        item.alive = false;
+        pruned = true;
+        continue;
+      }
+      if (!car.crashed) {
+        const dx = item.x - car.x;
+        const dy = item.y - car.y;
+        const radius = item.type === "fuel" ? 1.95 : 1.55;
+        if (dx * dx + dy * dy < radius * radius) collectItem(item);
+      }
+    }
+    if (pruned && Math.random() < 0.06) {
+      items = items.filter((it) => it.alive);
+    }
+  }
+
+  /* ---------- crash / physics ---------- */
+  function addShake(v) {
+    shake = Math.min(1.6, shake + v);
+  }
+
+  function roofHitsGround() {
+    const c = Math.cos(car.angle);
+    const s = Math.sin(car.angle);
+    const roofY = -0.62;
+    const points = [-0.62, 0.58];
+    for (const lx of points) {
+      const wx = car.x + lx * c - roofY * s;
+      const wy = car.y + lx * s + roofY * c;
+      if (wy > heightAt(wx) - 0.015) return true;
+    }
+    return false;
+  }
+
+  function simulate(dt) {
+    elapsed += dt;
+
+    const gasHeld = readGas();
+    const brakeHeld = readBrake();
+    const canDrive = fuel > 0 && !car.crashed;
+    const throttle = canDrive && gasHeld && !brakeHeld;
+    const brake = !car.crashed && brakeHeld && !gasHeld;
+
+    if (!car.crashed) {
+      const speed = Math.abs(car.vx);
+      fuel = Math.max(0, fuel - dt * (0.48 + (throttle ? 2.05 : 0) + (brake ? 0.12 : 0) + Math.min(speed * 0.016, 0.34)));
+    }
+
+    let ax = 0;
+    let ay = GRAVITY;
+    let alpha = 0;
+    car.contactCount = 0;
+
+    const cosA = Math.cos(car.angle);
+    const sinA = Math.sin(car.angle);
+
+    for (let i = 0; i < 2; i++) {
+      const lx = i === 0 ? -1.08 : 1.08;
+      const ly = 0.34;
+      const wx = car.x + lx * cosA - ly * sinA;
+      const wy = car.y + lx * sinA + ly * cosA;
+      const gy = heightAt(wx);
+      const slope = slopeAt(wx);
+      const norm = 1 / Math.sqrt(1 + slope * slope);
+      const nx = slope * norm;
+      const ny = -norm;
+      const tx = norm;
+      const ty = slope * norm;
+      const rx = wx - car.x;
+      const ry = wy - car.y;
+      const pvx = car.vx - car.omega * ry;
+      const pvy = car.vy + car.omega * rx;
+      const vn = pvx * nx + pvy * ny;
+      const vt = pvx * tx + pvy * ty;
+      const pen = wy + WHEEL_RADIUS - gy;
+
+      car.wheelWorld[i].x = wx;
+      car.wheelWorld[i].y = wy;
+      car.contact[i] = pen > 0;
+
+      if (pen > 0) {
+        car.contactCount++;
+        const compression = Math.min(pen, 0.7);
+        let fn = SPRING * compression - DAMPER * vn;
+        fn = clamp(fn, 0, 62000);
+        ax += (nx * fn) / CAR_MASS;
+        ay += (ny * fn) / CAR_MASS;
+        alpha += (rx * ny * fn - ry * nx * fn) / CAR_INERTIA;
+
+        let ft = 0;
+        const share = i === 0 ? 0.54 : 0.46;
+        if (throttle) ft += ENGINE * share;
+        if (brake) {
+          if (vt > 0.8) ft -= BRAKE * share;
+          else if (vt > -0.6) ft -= ENGINE * 0.54 * share;
+        }
+        if (!throttle && !brake) {
+          ft -= Math.sign(vt) * Math.min(Math.abs(vt) * 16, 62);
+        }
+        const traction = fn * 1.45;
+        ft = clamp(ft, -traction, traction);
+        ax += (tx * ft) / CAR_MASS;
+        ay += (ty * ft) / CAR_MASS;
+        alpha += ((rx * ty - ry * tx) * ft * 0.38) / CAR_INERTIA;
+
+        car.wheelSpin[i] += (vt / WHEEL_RADIUS) * dt + (throttle ? 7.5 * dt : 0);
+      } else {
+        car.wheelSpin[i] += (car.vx / WHEEL_RADIUS) * dt * 0.45;
+      }
+    }
+
+    if (car.contactCount === 0) {
+      if (gasHeld && !brakeHeld) alpha -= 4.15;
+      if (brakeHeld && !gasHeld) alpha += 4.15;
+      alpha -= car.omega * 0.26;
+    } else {
+      alpha -= car.omega * 0.7;
+    }
+
+    ax -= car.vx * Math.abs(car.vx) * 0.0024;
+    ay -= car.vy * Math.abs(car.vy) * 0.0017;
+    ax -= car.vx * 0.035;
+
+    car.vx = clamp(car.vx + ax * dt, -45, 45);
+    car.vy = clamp(car.vy + ay * dt, -45, 45);
+    car.omega = clamp(car.omega + alpha * dt, -13, 13);
+    car.x += car.vx * dt;
+    car.y += car.vy * dt;
+    car.angle += car.omega * dt;
+
+    if (car.contactCount > 0) {
+      stuckTimer = Math.abs(car.vx) < 0.35 && (throttle || brake) ? stuckTimer + dt : 0;
+      if (stuckTimer > 5.2) {
+        respawn(true);
+      }
+    } else {
+      stuckTimer = 0;
+    }
+
+    if (car.contactCount > 0 && contactWasAir && car.vy > 2.7) {
+      addShake(0.75);
+      spawnDust(car.x, car.y + 0.5, 0);
+      spawnDust(car.x + 0.7, car.y + 0.45, 1);
+    }
+    contactWasAir = car.contactCount === 0;
+
+    if (!car.crashed && (roofHitsGround() || (Math.abs(Math.atan2(Math.sin(car.angle), Math.cos(car.angle))) > 2.25 && car.contactCount > 0))) {
+      car.crashed = true;
+      car.crashTimer = 0;
+      car.omega *= 0.55;
+      addShake(1.05);
+      crashSound();
+      showToast("翻车了", "稳住车身，马上回到山脊");
+    }
+
+    if (car.crashed) {
+      car.crashTimer += dt;
+      if (car.crashTimer > 1.5) respawn(false);
+    }
+
+    if (car.contactCount > 0 && (throttle || brake) && Math.random() < dt * 28) {
+      for (let i = 0; i < 2; i++) {
+        if (car.contact[i]) {
+          spawnDust(car.wheelWorld[i].x, car.wheelWorld[i].y + 0.3, i === 0 ? -1 : 1);
+        }
+      }
+    }
+
+    if (throttle || (gasHeld && car.contactCount === 0)) {
+      exhaustTimer -= dt;
+      if (exhaustTimer <= 0) {
+        spawnExhaust();
+        exhaustTimer = 0.055 + Math.random() * 0.05;
+      }
+    }
+
+    car.maxX = Math.max(car.maxX, car.x);
+    distance = Math.max(distance, car.maxX - START_X);
+
+    updateItems();
+    ensureChunksAhead();
+    updateParticles(dt);
+
+    if (fuel <= 20 && !lowFuelWarned && !car.crashed) {
+      lowFuelWarned = true;
+      showToast("燃油告急", "寻找下一个红色油桶");
+    }
+    if (fuel <= 0) {
+      emptyTimer += dt;
+      if (!emptyWarned) {
+        emptyWarned = true;
+        showToast("燃油耗尽", "靠惯性寻找下坡");
+      }
+      const speed = Math.hypot(car.vx, car.vy);
+      if ((speed < 0.9 && emptyTimer > 1.4) || emptyTimer > 15) endRun();
+    }
+
+  }
+
+  /* ---------- HUD ---------- */
+  function updateBestUi() {
+    const hasBest = save.best > 0;
+    el.introBest.textContent = hasBest ? String(save.best) : "尚无";
+    el.introBest.classList.toggle("is-empty", !hasBest);
+    el.introBest.parentElement.classList.toggle("is-empty", !hasBest);
+    el.bestHud.textContent = String(save.best);
+  }
+
+  function updateHud(force) {
+    const d = Math.floor(distance);
+    if (force || d !== lastHud.distance) {
+      el.distance.textContent = String(d);
+      lastHud.distance = d;
+    }
+    if (force || save.best !== lastHud.best) {
+      el.bestHud.textContent = String(save.best);
+      lastHud.best = save.best;
+    }
+    if (force || coins !== lastHud.coins) {
+      el.coins.textContent = String(coins);
+      lastHud.coins = coins;
+    }
+    const f = Math.ceil(fuel);
+    if (force || f !== lastHud.fuel) {
+      el.fuelValue.textContent = f + "%";
+      el.fuelTrack.setAttribute("aria-valuenow", String(f));
+      el.fuelPanel.classList.toggle("is-low", fuel <= 20);
+      lastHud.fuel = f;
+    }
+    el.fuelFill.style.transform = "scaleX(" + clamp(fuel / 100, 0, 1) + ")";
+    app.classList.toggle("is-low-fuel", fuel <= 20 && state === "playing" && !car.crashed);
+
+    const speed = Math.round(Math.abs(car.vx) * 3.6);
+    if (force || speed !== lastHud.speed) {
+      el.speedValue.textContent = String(speed);
+      el.speedFill.style.width = clamp(speed / 110, 0, 1) * 100 + "%";
+      lastHud.speed = speed;
+    }
+  }
+
+  function showToast(main, detail) {
+    el.toastMain.textContent = main;
+    el.toastDetail.textContent = detail || "";
+    el.toast.classList.add("is-visible");
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      el.toast.classList.remove("is-visible");
+    }, 2200);
+  }
+
+  /* ---------- overlays ---------- */
+  function openOverlay(node, focusTarget) {
+    node.classList.remove("is-hidden");
+    node.removeAttribute("inert");
+    node.setAttribute("aria-hidden", "false");
+    if (focusTarget) {
+      window.setTimeout(() => {
+        try { focusTarget.focus({ preventScroll: true }); } catch (_) {}
+      }, 60);
+    }
+  }
+  function closeOverlay(node) {
+    if (node.contains(document.activeElement) && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+    node.classList.add("is-hidden");
+    node.setAttribute("inert", "");
+    node.setAttribute("aria-hidden", "true");
+  }
+
+  /* ---------- drawing ---------- */
+  function drawSky(t) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#081b20");
+    g.addColorStop(0.26, "#15363b");
+    g.addColorStop(0.48, "#46615e");
+    g.addColorStop(0.62, "#a67358");
+    g.addColorStop(0.75, "#e2a363");
+    g.addColorStop(0.88, "#f4cd93");
+    g.addColorStop(1, "#8a7b5e");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // faint pre-dawn stars
+    ctx.save();
+    for (let i = 0; i < 22; i++) {
+      const x = hash(i * 3.1) * W;
+      const y = hash(i * 7.7 + 2) * H * 0.3;
+      const a = 0.12 + hash(i * 11.3) * 0.35;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#f4e8d2";
+      ctx.fillRect(x, y, 1.2, 1.2);
+    }
+    ctx.restore();
+
+    const sunX = W * 0.73;
+    const sunY = H * 0.49;
+    const sunR = Math.max(30, Math.min(W, H) * 0.054);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 7);
+    glow.addColorStop(0, "rgba(255,218,147,.44)");
+    glow.addColorStop(0.22, "rgba(245,175,101,.2)");
+    glow.addColorStop(0.56, "rgba(227,119,67,.06)");
+    glow.addColorStop(1, "rgba(227,119,67,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR * 7, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    const disc = ctx.createLinearGradient(0, sunY - sunR, 0, sunY + sunR);
+    disc.addColorStop(0, "#fff1c6");
+    disc.addColorStop(0.65, "#f7c77f");
+    disc.addColorStop(1, "#eaa05f");
+    ctx.fillStyle = disc;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
+    drawClouds(t);
+    drawBirds(t);
+  }
+
+  function drawClouds(t) {
+    const drift = t * 2.3;
+    const clouds = [
+      { y: 0.17, x: 0.17, w: 0.28, h: 0.045, alpha: 0.055 },
+      { y: 0.27, x: 0.58, w: 0.33, h: 0.035, alpha: 0.08 },
+      { y: 0.39, x: 0.1, w: 0.2, h: 0.025, alpha: 0.045 },
+      { y: 0.22, x: 0.84, w: 0.24, h: 0.028, alpha: 0.05 },
+    ];
+    ctx.save();
+    for (let i = 0; i < clouds.length; i++) {
+      const c = clouds[i];
+      const x = ((c.x * W + drift * (0.45 + i * 0.1)) % (W + 500)) - 250;
+      const y = c.y * H;
+      const w = c.w * W;
+      const h = c.h * H;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(w, h));
+      g.addColorStop(0, "rgba(244,232,210," + c.alpha + ")");
+      g.addColorStop(0.5, "rgba(244,220,184," + c.alpha * 0.55 + ")");
+      g.addColorStop(1, "rgba(244,232,210,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(x, y, w, h, 0.01, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBirds(t) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(10,24,22,.46)";
+    ctx.lineWidth = 1;
+    const bx = W * 0.2 + Math.sin(t * 0.08) * 20;
+    const by = H * 0.22;
+    for (let i = 0; i < 3; i++) {
+      const x = bx + i * 18 + Math.sin(t * 0.3 + i) * 4;
+      const y = by + i * 7;
+      ctx.beginPath();
+      ctx.moveTo(x - 5, y);
+      ctx.quadraticCurveTo(x - 2, y - 2.5, x, y);
+      ctx.quadraticCurveTo(x + 2, y - 2.5, x + 5, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function ridgeValue(u, phase, detail) {
+    return (
+      0.445 +
+      0.285 * Math.sin(u * 2.05 + phase) +
+      0.155 * Math.sin(u * 5.45 + phase * 1.73 + 1.1) +
+      0.075 * Math.sin(u * 12.7 + phase * 0.62) +
+      (detail ? 0.042 * Math.sin(u * 27.3 + Math.PI * 0.4) + 0.022 * Math.sin(u * 49.7) : 0)
+    );
+  }
+
+  function mountainLayer(baseY, amp, colorTop, colorBottom, parallax, phase, detail, trees) {
+    const offset = camera.x * view.scale * parallax;
+    const pts = [];
+    for (let x = -40; x <= W + 50; x += 7) {
+      const u = (x + offset) * 0.001 + phase;
+      const ridge = clamp(ridgeValue(u, phase, detail), 0.055, 1.1);
+      pts.push({ x, y: baseY - amp * ridge });
+    }
+    ctx.beginPath();
+    ctx.moveTo(-40, H + 10);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(W + 50, H + 10);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, baseY - amp, 0, baseY + H * 0.24);
+    g.addColorStop(0, colorTop);
+    g.addColorStop(0.46, colorBottom);
+    g.addColorStop(1, colorBottom);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // A sunlit crest and tiny ridgeline pines give the layers depth without
+    // turning them into scenery that competes with the playable slope.
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = "#f4d7a2";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      if (i === 0) ctx.moveTo(pts[i].x, pts[i].y + 1.2);
+      else ctx.lineTo(pts[i].x, pts[i].y + 1.2);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    if (trees) {
+      ctx.save();
+      for (let x = -30; x < W + 30; x += 16) {
+        const q = hash(x * 0.071 + phase * 83.1);
+        if (q < 0.53) continue;
+        const u = (x + offset) * 0.001 + phase;
+        const ridge = clamp(ridgeValue(u, phase, detail), 0.055, 1.1);
+        const y = baseY - amp * ridge + 1;
+        const h = 4 + q * 9;
+        const w = h * 0.36;
+        ctx.fillStyle = "rgba(8,25,20,.38)";
+        ctx.beginPath();
+        ctx.moveTo(x - w, y + 1);
+        ctx.lineTo(x, y - h);
+        ctx.lineTo(x + w, y + 1);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawMountains() {
+    mountainLayer(H * 0.7, H * 0.27, "#b2a58e", "#7a887e", 0.014, 0.45, false, false);
+    mountainLayer(H * 0.77, H * 0.25, "#6b8077", "#3e594f", 0.038, 2.25, true, true);
+    mountainLayer(H * 0.88, H * 0.22, "#2b4a3f", "#0c2620", 0.083, 3.9, true, true);
+    const haze = ctx.createLinearGradient(0, H * 0.46, 0, H * 0.82);
+    haze.addColorStop(0, "rgba(240,177,94,0)");
+    haze.addColorStop(0.52, "rgba(240,177,94,.13)");
+    haze.addColorStop(1, "rgba(9,25,21,.26)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, H * 0.46, W, H * 0.36);
+  }
+
+  function terrainPoints(stepPx) {
+    const pts = [];
+    const step = stepPx || 7;
+    for (let x = -20; x <= W + 20; x += step) {
+      const wx = view.x + (x - W * 0.5) / view.scale;
+      const wy = heightAt(wx);
+      pts.push({ x, y: toScreenY(wy), wx, wy });
+    }
+    return pts;
+  }
+
+  function drawTerrain(t) {
+    const pts = terrainPoints(6);
+    if (!pts.length) return;
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, H + 30);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(pts[pts.length - 1].x, H + 30);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, H * 0.35, 0, H + 20);
+    g.addColorStop(0, "#214638");
+    g.addColorStop(0.36, "#102a20");
+    g.addColorStop(0.74, "#0a1d17");
+    g.addColorStop(1, "#05120e");
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // topographic cut lines under the crest
+    ctx.save();
+    ctx.globalAlpha = 0.24;
+    for (let layer = 1; layer <= 4; layer++) {
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const yy = p.y + layer * Math.max(12, view.scale * 0.58);
+        if (i === 0) ctx.moveTo(p.x, yy);
+        else ctx.lineTo(p.x, yy);
+      }
+      ctx.strokeStyle = layer === 1 ? "rgba(226,174,103,.26)" : layer === 3 ? "rgba(226,174,103,.13)" : "rgba(226,174,103,.07)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // fine strata running through the cut face
+    ctx.save();
+    for (let i = 0; i < 17; i++) {
+      const wx = view.x - W / view.scale / 2 + (i / 16) * (W / view.scale) + hash(i * 3.1) * 5;
+      const x = toScreenX(wx);
+      const y = toScreenY(heightAt(wx));
+      const len = 8 + hash(i * 9.7) * 34;
+      ctx.strokeStyle = "rgba(222,169,100," + (0.035 + hash(i * 5.2) * 0.05) + ")";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 18 + hash(i * 2.3) * 42);
+      ctx.lineTo(x + (hash(i * 7.4) - 0.5) * 22, y + 18 + hash(i * 2.3) * 42 + len);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // warm rim light
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = "rgba(235,99,58,.3)";
+    ctx.lineWidth = 9;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    ctx.strokeStyle = "#e9ae60";
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,238,198,.52)";
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+
+    // small surface tufts and stones
+    const worldStart = Math.floor((view.x - W / view.scale / 2 - 4) / 2.6);
+    const worldEnd = Math.ceil((view.x + W / view.scale / 2 + 4) / 2.6);
+    ctx.save();
+    for (let i = worldStart; i <= worldEnd; i++) {
+      const r = hash(i * 7.17);
+      const wx = i * 2.6 + r * 1.9;
+      const x = toScreenX(wx);
+      const y = toScreenY(heightAt(wx));
+      if (x < -20 || x > W + 20) continue;
+      if (r > 0.61) {
+        ctx.strokeStyle = "rgba(230,181,112," + (0.27 + r * 0.24) + ")";
+        ctx.lineWidth = 1;
+        const h = 4 + r * 8;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 1);
+        ctx.lineTo(x - 1.4, y - h);
+        ctx.moveTo(x + 1, y - 1);
+        ctx.lineTo(x + 2.2, y - h * 0.72);
+        if (r > 0.84) {
+          ctx.moveTo(x + 0.3, y - 1);
+          ctx.lineTo(x + 0.8, y - h * 1.24);
+        }
+        ctx.stroke();
+      } else if (r < 0.15) {
+        ctx.fillStyle = "rgba(36,58,46,.8)";
+        ctx.beginPath();
+        ctx.moveTo(x - 3.5, y + 2);
+        ctx.lineTo(x - 1, y - 4 - r * 16);
+        ctx.lineTo(x + 3.5, y + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(239,190,117,.16)";
+        ctx.fillRect(x, y - 2, 1.4, 1.4);
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawStartMarker() {
+    drawMarker(START_X + 11, "START", true);
+  }
+
+  function drawMilestones() {
+    const leftWorld = view.x - W / view.scale / 2 - 20;
+    const rightWorld = view.x + W / view.scale / 2 + 20;
+    const first = Math.max(100, Math.ceil((leftWorld - START_X) / 100) * 100);
+    for (let m = first; m <= rightWorld - START_X; m += 100) {
+      drawMarker(START_X + m, String(m), false);
+    }
+  }
+
+  function drawMarker(x, label, start) {
+    const gy = heightAt(x);
+    const bx = toScreenX(x);
+    const by = toScreenY(gy);
+    if (bx < -80 || bx > W + 80) return;
+    const s = view.scale;
+    const poleH = (start ? 3.2 : 2.5) * s;
+    ctx.save();
+    ctx.strokeStyle = "rgba(242,230,207,.7)";
+    ctx.lineWidth = Math.max(1, 0.055 * s);
+    ctx.beginPath();
+    ctx.moveTo(bx, by + 2);
+    ctx.lineTo(bx, by - poleH);
+    ctx.stroke();
+
+    // flag
+    const flagH = Math.max(9, 0.52 * s);
+    const flagW = Math.max(18, (start ? 1.5 : 1.0) * s);
+    const flutter = Math.sin(elapsed * 2.4 + x) * 2.2;
+    ctx.fillStyle = start ? "#eb633a" : "rgba(226,164,91,.85)";
+    ctx.beginPath();
+    ctx.moveTo(bx, by - poleH);
+    ctx.lineTo(bx + flagW, by - poleH + flagH * 0.2 + flutter);
+    ctx.lineTo(bx, by - poleH + flagH);
+    ctx.closePath();
+    ctx.fill();
+
+    // plate
+    if (start || label !== "") {
+      const pw = Math.max(28, (label.length > 3 ? 2.4 : 1.45) * s);
+      const ph = Math.max(14, 0.48 * s);
+      const px = bx - pw * 0.5;
+      const py = by - poleH * 0.58;
+      ctx.fillStyle = "rgba(6,17,13,.8)";
+      ctx.strokeStyle = "rgba(244,232,210,.32)";
+      ctx.lineWidth = 1;
+      ctx.fillRect(px, py, pw, ph);
+      ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+      ctx.fillStyle = "#f4e8d2";
+      ctx.font = "500 " + Math.max(8, Math.round(ph * 0.48)) + "px " + '"IBM Plex Mono",monospace';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, bx, py + ph * 0.52);
+    }
+    ctx.restore();
+  }
+
+  function drawItems(t) {
+    const left = view.x - W / view.scale / 2 - 10;
+    const right = view.x + W / view.scale / 2 + 10;
+    for (const item of items) {
+      if (!item.alive || item.x < left || item.x > right) continue;
+      const bob = Math.sin(t * 2.1 + item.phase) * 0.12;
+      const x = toScreenX(item.x);
+      const y = toScreenY(item.y + bob);
+      if (item.type === "coin") drawCoin(x, y, t, item.phase);
+      else drawFuel(x, y, t, item.phase);
+    }
+  }
+
+  function drawCoin(x, y, t, phase) {
+    const s = view.scale;
+    const r = Math.max(9, 0.34 * s);
+    const spin = Math.cos(t * 2.75 + phase);
+    const wide = 0.18 + Math.abs(spin) * 0.82;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalCompositeOperation = "lighter";
+    const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.6);
+    halo.addColorStop(0, "rgba(244,194,101,.17)");
+    halo.addColorStop(1, "rgba(244,194,101,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 2.6, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    ctx.scale(wide, 1);
+    const g = ctx.createLinearGradient(-r, -r, r, r);
+    g.addColorStop(0, "#ffe2a0");
+    g.addColorStop(0.48, "#edb85e");
+    g.addColorStop(1, "#a86c26");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(92,52,15,.65)";
+    ctx.lineWidth = Math.max(1, r * 0.1);
+    ctx.stroke();
+    if (wide > 0.46) {
+      ctx.strokeStyle = "rgba(255,239,197,.7)";
+      ctx.lineWidth = Math.max(1, r * 0.08);
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.55, 0.3, 2.3);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawFuel(x, y, t, phase) {
+    const s = view.scale;
+    const w = Math.max(20, 0.62 * s);
+    const h = w * 1.22;
+    ctx.save();
+    ctx.translate(x, y + Math.sin(t * 1.8 + phase) * 2);
+    ctx.globalCompositeOperation = "lighter";
+    const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 1.75);
+    halo.addColorStop(0, "rgba(235,99,58,.22)");
+    halo.addColorStop(1, "rgba(235,99,58,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, w * 1.75, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    // can body
+    ctx.fillStyle = "#e05a32";
+    ctx.strokeStyle = "rgba(20,20,15,.72)";
+    ctx.lineWidth = Math.max(1.2, w * 0.055);
+    roundRect(ctx, -w * 0.3, -h * 0.46, w * 0.62, h * 0.82, w * 0.07);
+    ctx.fill();
+    ctx.stroke();
+    // handle
+    ctx.strokeStyle = "rgba(32,22,15,.75)";
+    ctx.lineWidth = Math.max(1.5, w * 0.075);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.13, -h * 0.46);
+    ctx.lineTo(-w * 0.13, -h * 0.56);
+    ctx.lineTo(w * 0.2, -h * 0.56);
+    ctx.lineTo(w * 0.2, -h * 0.46);
+    ctx.stroke();
+    // spout
+    ctx.fillStyle = "#f1d6a9";
+    ctx.fillRect(w * 0.23, -h * 0.35, w * 0.16, h * 0.15);
+    ctx.fillStyle = "#1c2c22";
+    ctx.fillRect(w * 0.25, -h * 0.34, w * 0.08, h * 0.055);
+    // label
+    ctx.fillStyle = "#f6e5c6";
+    ctx.font = "700 " + Math.max(7, w * 0.19) + "px " + '"Barlow Condensed",sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("FUEL", 0, h * 0.07);
+    ctx.strokeStyle = "rgba(244,229,196,.5)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.17, h * 0.22);
+    ctx.lineTo(w * 0.17, h * 0.22);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    const rr = Math.min(r, w * 0.5, h * 0.5);
+    c.beginPath();
+    c.moveTo(x + rr, y);
+    c.arcTo(x + w, y, x + w, y + h, rr);
+    c.arcTo(x + w, y + h, x, y + h, rr);
+    c.arcTo(x, y + h, x, y, rr);
+    c.arcTo(x, y, x + w, y, rr);
+    c.closePath();
+  }
+
+  function drawParticles(front) {
+    ctx.save();
+    for (const p of particles) {
+      const isSpark = p.type === "spark";
+      if (isSpark !== front) continue;
+      const x = toScreenX(p.x);
+      const y = toScreenY(p.y);
+      if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
+      const k = clamp(p.life / p.maxLife, 0, 1);
+      const r = Math.max(1, p.size * view.scale * (1.2 - k * 0.45));
+      if (p.type === "dust") {
+        ctx.fillStyle = "rgba(220,169,106," + (k * 0.23) + ")";
+      } else if (p.type === "smoke") {
+        ctx.fillStyle = "rgba(223,216,194," + (k * 0.12) + ")";
+      } else {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = p.color || "#f4c76d";
+        ctx.globalAlpha = k * 0.8;
+      }
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.fill();
+      if (p.type === "spark") {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawCar(t) {
+    const sx = toScreenX(car.x);
+    const sy = toScreenY(car.y);
+    const s = view.scale;
+
+    // ground shadow
+    const gx = car.x;
+    const gy = heightAt(gx);
+    const shadowY = toScreenY(gy + 0.04);
+    const shadowX = sx;
+    ctx.save();
+    ctx.globalAlpha = 0.34;
+    ctx.fillStyle = "#02100c";
+    ctx.beginPath();
+    ctx.ellipse(shadowX, shadowY, s * 1.28, Math.max(2, s * 0.1), Math.atan(slopeAt(gx)), 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
+    if (sx < -140 || sx > W + 140 || sy < -140 || sy > H + 140) return;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(car.angle);
+    ctx.scale(s, s);
+
+    // wheels first
+    for (let i = 0; i < 2; i++) {
+      const wx = i === 0 ? -1.08 : 1.08;
+      const wy = 0.34;
+      const spin = car.wheelSpin[i];
+      // suspension arm
+      ctx.strokeStyle = "rgba(13,24,19,.92)";
+      ctx.lineWidth = 0.075;
+      ctx.beginPath();
+      ctx.moveTo(wx * 0.46, 0.1);
+      ctx.lineTo(wx, wy);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(wx, wy);
+      ctx.rotate(spin);
+      ctx.fillStyle = "#0b100d";
+      ctx.strokeStyle = "#2b352c";
+      ctx.lineWidth = 0.055;
+      ctx.beginPath();
+      ctx.arc(0, 0, WHEEL_RADIUS, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      // tire treads
+      ctx.strokeStyle = "rgba(244,232,210,.15)";
+      ctx.lineWidth = 0.038;
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * (WHEEL_RADIUS - 0.075), Math.sin(a) * (WHEEL_RADIUS - 0.075));
+        ctx.lineTo(Math.cos(a) * WHEEL_RADIUS, Math.sin(a) * WHEEL_RADIUS);
+        ctx.stroke();
+      }
+      // rim
+      ctx.fillStyle = "#d8c59f";
+      ctx.beginPath();
+      ctx.arc(0, 0, WHEEL_RADIUS * 0.56, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#1b2b22";
+      ctx.beginPath();
+      ctx.arc(0, 0, WHEEL_RADIUS * 0.35, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = "#d8c59f";
+      ctx.lineWidth = 0.045;
+      for (let k = 0; k < 4; k++) {
+        const a = (k / 4) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * WHEEL_RADIUS * 0.1, Math.sin(a) * WHEEL_RADIUS * 0.1);
+        ctx.lineTo(Math.cos(a) * WHEEL_RADIUS * 0.33, Math.sin(a) * WHEEL_RADIUS * 0.33);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // headlight warm wash
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const head = ctx.createRadialGradient(1.4, -0.04, 0, 1.4, -0.04, 2.2);
+    head.addColorStop(0, "rgba(255,220,152,.22)");
+    head.addColorStop(1, "rgba(255,220,152,0)");
+    ctx.fillStyle = head;
+    ctx.beginPath();
+    ctx.arc(1.4, -0.04, 2.2, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
+    // body
+    ctx.beginPath();
+    ctx.moveTo(-1.52, 0.15);
+    ctx.quadraticCurveTo(-1.58, -0.12, -1.4, -0.2);
+    ctx.lineTo(-0.66, -0.24);
+    ctx.lineTo(-0.3, -0.65);
+    ctx.quadraticCurveTo(-0.2, -0.73, 0.02, -0.73);
+    ctx.lineTo(0.47, -0.7);
+    ctx.quadraticCurveTo(0.62, -0.68, 0.72, -0.53);
+    ctx.lineTo(0.98, -0.24);
+    ctx.lineTo(1.4, -0.18);
+    ctx.quadraticCurveTo(1.57, -0.12, 1.58, 0.08);
+    ctx.lineTo(1.48, 0.28);
+    ctx.lineTo(0.93, 0.3);
+    ctx.lineTo(-1.08, 0.3);
+    ctx.closePath();
+    const bodyG = ctx.createLinearGradient(0, -0.72, 0, 0.32);
+    bodyG.addColorStop(0, "#f5ead6");
+    bodyG.addColorStop(0.5, "#e6d3ae");
+    bodyG.addColorStop(1, "#bf9b6d");
+    ctx.fillStyle = bodyG;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(13,25,19,.9)";
+    ctx.lineWidth = 0.065;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    // rally livery
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-1.52, 0.15);
+    ctx.quadraticCurveTo(-1.58, -0.12, -1.4, -0.2);
+    ctx.lineTo(-0.66, -0.24);
+    ctx.lineTo(-0.3, -0.65);
+    ctx.quadraticCurveTo(-0.2, -0.73, 0.02, -0.73);
+    ctx.lineTo(0.47, -0.7);
+    ctx.quadraticCurveTo(0.62, -0.68, 0.72, -0.53);
+    ctx.lineTo(0.98, -0.24);
+    ctx.lineTo(1.4, -0.18);
+    ctx.quadraticCurveTo(1.57, -0.12, 1.58, 0.08);
+    ctx.lineTo(1.48, 0.28);
+    ctx.lineTo(0.93, 0.3);
+    ctx.lineTo(-1.08, 0.3);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = "#eb633a";
+    ctx.beginPath();
+    ctx.moveTo(-1.5, -0.29);
+    ctx.lineTo(1.55, -0.2);
+    ctx.lineTo(1.55, -0.07);
+    ctx.lineTo(-1.5, -0.13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // window / cabin
+    ctx.fillStyle = "#173732";
+    ctx.strokeStyle = "rgba(14,30,24,.8)";
+    ctx.lineWidth = 0.035;
+    ctx.beginPath();
+    ctx.moveTo(-0.22, -0.57);
+    ctx.lineTo(0.3, -0.57);
+    ctx.quadraticCurveTo(0.48, -0.53, 0.55, -0.38);
+    ctx.lineTo(0.61, -0.27);
+    ctx.lineTo(-0.38, -0.27);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // driver
+    ctx.fillStyle = "rgba(239,220,188,.7)";
+    ctx.beginPath();
+    ctx.arc(0.04, -0.43, 0.085, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#1c2b22";
+    ctx.beginPath();
+    ctx.arc(0.04, -0.46, 0.09, Math.PI, TAU);
+    ctx.fill();
+
+    // door number
+    ctx.fillStyle = "rgba(15,31,24,.8)";
+    ctx.font = '600 0.28px "Barlow Condensed", sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("07", -0.87, -0.01);
+
+    // lights
+    ctx.fillStyle = "#ffe4a5";
+    ctx.beginPath();
+    ctx.ellipse(1.45, -0.09, 0.1, 0.075, -0.1, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#bf3c28";
+    ctx.beginPath();
+    ctx.ellipse(-1.49, -0.055, 0.055, 0.09, 0.1, 0, TAU);
+    ctx.fill();
+
+    // mud flaps
+    ctx.fillStyle = "#111812";
+    ctx.fillRect(-1.48, 0.27, 0.13, 0.25);
+    ctx.fillRect(0.98, 0.27, 0.13, 0.25);
+
+    // antenna
+    ctx.strokeStyle = "rgba(15,27,21,.8)";
+    ctx.lineWidth = 0.02;
+    ctx.beginPath();
+    ctx.moveTo(-1.15, -0.22);
+    ctx.quadraticCurveTo(-1.22, -0.65, -1.31, -0.75);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawAmbient(t) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 16; i++) {
+      const x = ((hash(i * 8.3) * W + t * (3 + i * 0.22)) % (W + 60)) - 30;
+      const y = hash(i * 5.1) * H * 0.7 + Math.sin(t * 0.3 + i) * 8;
+      const a = 0.08 + hash(i * 2.7) * 0.11;
+      ctx.fillStyle = "rgba(244,196,123," + a + ")";
+      ctx.beginPath();
+      ctx.arc(x, y, 0.8 + hash(i * 4.2) * 1.3, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function render(t) {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawSky(t);
+    drawMountains();
+    makeView();
+    drawStartMarker();
+    drawMilestones();
+    drawTerrain(t);
+    drawItems(t);
+    drawParticles(false);
+    drawCar(t);
+    drawParticles(true);
+    drawAmbient(t);
+
+    // gentle film grain, drawn from a tiny generated texture
+    if (noisePattern) {
+      ctx.save();
+      ctx.globalAlpha = 0.045;
+      ctx.globalCompositeOperation = "overlay";
+      ctx.fillStyle = noisePattern;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+  }
+
+  /* ---------- grain texture ---------- */
+  let noisePattern = null;
+  function makeNoise() {
+    try {
+      const n = document.createElement("canvas");
+      n.width = 180;
+      n.height = 180;
+      const nctx = n.getContext("2d");
+      const data = nctx.createImageData(n.width, n.height);
+      for (let i = 0; i < data.data.length; i += 4) {
+        const v = Math.random() * 255;
+        data.data[i] = v;
+        data.data[i + 1] = v;
+        data.data[i + 2] = v;
+        data.data[i + 3] = 30;
+      }
+      nctx.putImageData(data, 0, 0);
+      noisePattern = ctx.createPattern(n, "repeat");
+    } catch (_) {}
+  }
+
+  /* ---------- main loop ---------- */
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!lastFrame) lastFrame = now;
+    let dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    dt = clamp(dt, 0, 0.05);
+
+    if (state === "playing") {
+      accumulator += dt;
+      let steps = 0;
+      while (accumulator >= GOAL_STEP && steps < 6) {
+        simulate(GOAL_STEP);
+        accumulator -= GOAL_STEP;
+        steps++;
+      }
+    } else {
+      updateParticles(dt);
+    }
+
+    if (state === "playing") updateHud(false);
+    updateCamera(dt);
+    render(now / 1000);
+    updateAudio();
+  }
+
+  /* ---------- events ---------- */
+  function handleKeyDown(e) {
+    if (e.repeat) return;
+    const code = e.code;
+    const targetTag = e.target && e.target.tagName;
+    if (code === "Tab") return;
+    if (state === "intro") {
+      if (code === "Enter" || code === "Space") {
+        if (targetTag === "BUTTON") return;
+        e.preventDefault();
+        startRun();
+        return;
+      }
+    }
+    if (code === "Enter" && state === "over" && targetTag !== "BUTTON") {
+      e.preventDefault();
+      startRun();
+      return;
+    }
+    if (code === "Enter" && state === "paused" && targetTag !== "BUTTON") {
+      e.preventDefault();
+      resumeGame();
+      return;
+    }
+    if (code === "KeyM") {
+      e.preventDefault();
+      setMuted(!muted);
+      return;
+    }
+    if (code === "KeyP" || code === "Escape") {
+      if (state === "playing") {
+        e.preventDefault();
+        pauseGame();
+      } else if (state === "paused") {
+        e.preventDefault();
+        resumeGame();
+      }
+      return;
+    }
+    if (code === "KeyR") {
+      if (state === "playing") {
+        e.preventDefault();
+        respawn(false);
+      } else if (state === "paused") {
+        e.preventDefault();
+        resumeGame();
+        respawn(false);
+      }
+      return;
+    }
+    if (state !== "playing" && targetTag === "BUTTON" && (code === "Space" || code === "Enter")) return;
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"].includes(code)) {
+      e.preventDefault();
+    }
+    keys[code] = true;
+  }
+
+  function handleKeyUp(e) {
+    keys[e.code] = false;
+  }
+
+  window.addEventListener("keydown", handleKeyDown, { passive: false });
+  window.addEventListener("keyup", handleKeyUp);
+  window.addEventListener("blur", () => {
+    for (const k of Object.keys(keys)) keys[k] = false;
+    clearPressed();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && state === "playing") pauseGame();
+  });
+
+  el.startBtn.addEventListener("click", startRun);
+  el.pauseBtn.addEventListener("click", pauseGame);
+  el.resumeBtn.addEventListener("click", resumeGame);
+  el.pauseRestartBtn.addEventListener("click", startRun);
+  el.againBtn.addEventListener("click", startRun);
+  el.homeBtn.addEventListener("click", goHome);
+  el.muteBtn.addEventListener("click", () => setMuted(!muted));
+  el.pauseMuteBtn.addEventListener("click", () => setMuted(!muted));
+
+  window.addEventListener("resize", () => {
+    resize();
+    if (state === "intro") snapCamera();
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => {
+      resize();
+      if (state === "intro") snapCamera();
+    });
+  }
+
+  /* ---------- boot ---------- */
+  function boot() {
+    resize();
+    makeNoise();
+    document.body.classList.toggle("is-muted", muted);
+    updateSoundButtons();
+    updateBestUi();
+    resetRun();
+    state = "intro";
+    el.hud.classList.add("is-hidden");
+    el.controls.classList.add("is-hidden");
+    el.speedo.classList.add("is-hidden");
+    el.pauseBtn.disabled = true;
+    closeOverlay(el.pauseOverlay);
+    closeOverlay(el.overOverlay);
+    openOverlay(el.intro);
+    snapCamera();
+    showToast("", "");
+    el.toast.classList.remove("is-visible");
+    requestAnimationFrame(frame);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
