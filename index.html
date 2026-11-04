@@ -51,46 +51,44 @@ svg{display:block}
 
 #app{position:fixed;inset:0;overflow:hidden;isolation:isolate;background:var(--ink)}
 #scene{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
-@property --frame-angle{syntax:"<angle>";inherits:false;initial-value:0deg}
 .impact-frame{
   --frame-color:var(--amber);
-  position:absolute;inset:11px;z-index:16;pointer-events:none;border:1px solid rgba(244,232,210,.12);
-  opacity:0;transition:opacity .2s ease,filter .2s ease;
-  box-shadow:inset 0 0 30px color-mix(in srgb,var(--frame-color) 9%,transparent);
+  position:absolute;inset:12px;z-index:16;pointer-events:none;
+  border:1px solid rgba(244,232,210,.08);
+  opacity:0;transition:opacity .25s ease, border-color .25s ease;
+  box-shadow:inset 0 0 24px color-mix(in srgb,var(--frame-color) 6%,transparent);
 }
-.impact-frame.is-active{opacity:.72}
+.impact-frame.is-active{opacity:.85}
 .impact-frame::before{
-  content:"";position:absolute;inset:-1px;border:2px solid transparent;
-  background:linear-gradient(rgba(7,21,17,.02),rgba(7,21,17,.02)) padding-box,
-    conic-gradient(from var(--frame-angle),transparent 0deg 34deg,var(--frame-color) 54deg 76deg,transparent 96deg 174deg,var(--frame-color) 194deg 216deg,transparent 236deg 360deg) border-box;
-  filter:drop-shadow(0 0 7px var(--frame-color));opacity:.82;
-  animation:frameOrbit 2.4s linear infinite;
+  content:"";position:absolute;inset:-1px;
+  border:1px solid var(--frame-color);
+  opacity:.35;pointer-events:none;
+  transition:opacity .2s ease, border-color .2s ease;
+}
+.impact-frame.is-airborne::before{
+  opacity:.7;
+  animation:framePulse 1.2s ease-in-out infinite;
 }
 .impact-frame::after{
-  content:"";position:absolute;inset:1px;opacity:.34;
+  content:"";position:absolute;inset:1px;opacity:.55;pointer-events:none;
   background:
-    linear-gradient(var(--frame-color),var(--frame-color)) left top/42px 2px no-repeat,
-    linear-gradient(var(--frame-color),var(--frame-color)) left top/2px 42px no-repeat,
-    linear-gradient(var(--frame-color),var(--frame-color)) right top/42px 2px no-repeat,
-    linear-gradient(var(--frame-color),var(--frame-color)) right top/2px 42px no-repeat,
-    linear-gradient(var(--frame-color),var(--frame-color)) left bottom/42px 2px no-repeat,
-    linear-gradient(var(--frame-color),var(--frame-color)) left bottom/2px 42px no-repeat,
-    linear-gradient(var(--frame-color),var(--frame-color)) right bottom/42px 2px no-repeat,
-    linear-gradient(var(--frame-color),var(--frame-color)) right bottom/2px 42px no-repeat;
+    linear-gradient(var(--frame-color),var(--frame-color)) left top/32px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) left top/2px 32px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right top/32px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right top/2px 32px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) left bottom/32px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) left bottom/2px 32px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right bottom/32px 2px no-repeat,
+    linear-gradient(var(--frame-color),var(--frame-color)) right bottom/2px 32px no-repeat;
+  transition:opacity .2s ease;
 }
-.impact-frame.is-airborne::after{animation:frameBreath 1.2s ease-in-out infinite}
-.impact-frame.is-impact::after{animation:frameImpact .72s ease-out 2}
-.impact-frame.is-crashing{filter:saturate(1.55)}
-.impact-frame.is-crashing.is-tier-2::before{animation-duration:.46s;filter:drop-shadow(0 0 12px var(--frame-color))}
-.impact-frame.is-tier-1::before{animation-duration:1.9s}
-.impact-frame.is-tier-2::before{animation-duration:1.25s;opacity:.94}
-.impact-frame.is-tier-3::before{animation-duration:.78s;opacity:1;border-width:3px;filter:drop-shadow(0 0 13px var(--frame-color))}
-.impact-frame.is-impact::before{animation-duration:.7s;animation-iteration-count:1}
-.impact-frame.is-impact.is-tier-2::before{animation-duration:.5s;animation-iteration-count:2}
-.impact-frame.is-impact.is-tier-3::before{animation-duration:.42s;animation-iteration-count:3}
-@keyframes frameOrbit{to{--frame-angle:360deg}}
-@keyframes frameBreath{0%,100%{opacity:.22}50%{opacity:.8}}
-@keyframes frameImpact{0%{opacity:1;filter:brightness(2.6)}100%{opacity:.2;filter:brightness(1)}}
+.impact-frame.is-tier-2::after{opacity:.85}
+.impact-frame.is-tier-3::after{opacity:1;filter:drop-shadow(0 0 6px var(--frame-color))}
+.impact-frame.is-impact::before{animation:frameImpactFlash .4s ease-out 1}
+.impact-frame.is-crashing{filter:saturate(1.6)}
+.impact-frame.is-crashing::before{border-color:var(--signal);opacity:1}
+@keyframes framePulse{0%,100%{opacity:.25}50%{opacity:.8}}
+@keyframes frameImpactFlash{0%{opacity:1;border-width:2px}100%{opacity:.35;border-width:1px}}
 .vignette{
   position:absolute;inset:0;z-index:3;pointer-events:none;
   box-shadow:inset 0 0 180px rgba(1,8,6,.55), inset 0 -90px 120px rgba(1,8,6,.28);
@@ -155,6 +153,10 @@ svg{display:block}
 .coin-mark::after{content:"";width:3px;height:5px;border-radius:50%;background:#7e4c17;opacity:.55}
 #coinValue{display:inline-block;transform-origin:center;font-variant-numeric:tabular-nums}
 #coinValue.is-bumped{animation:coinBump .3s ease-out}
+.coin-delta{
+  font-family:var(--mono);font-size:9px;color:var(--amber);margin-left:2px;opacity:.9;
+  font-variant-numeric:tabular-nums;transition:opacity .2s ease;
+}
 @keyframes coinBump{0%{transform:scale(1);color:var(--paper)}34%{transform:scale(1.32);color:var(--amber)}100%{transform:scale(1);color:var(--paper)}}
 .icon-btn{
   width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line-soft);
@@ -465,7 +467,11 @@ kbd{
 
     <div class="hud-right">
       <div class="hud-tools">
-        <div class="coin-chip" title="累计金币"><span class="coin-mark" aria-hidden="true"></span><span id="coinValue">0</span></div>
+        <div class="coin-chip" title="累计金币">
+          <span class="coin-mark" aria-hidden="true"></span>
+          <span id="coinValue">0</span>
+          <span id="runCoinDelta" class="coin-delta is-hidden"></span>
+        </div>
         <button class="icon-btn" id="muteBtn" type="button" aria-label="静音" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 9.5h3.4L12 5.7v12.6l-4.6-3.8H4z"/>
@@ -557,7 +563,7 @@ kbd{
         <button class="btn-ghost" id="pauseRestartBtn" type="button">重新开始</button>
         <button class="sound-text btn-ghost" id="pauseMuteBtn" type="button">声音：开</button>
       </div>
-      <div class="modal-mini"><span>P</span><span>继续 / 暂停</span><span>·</span><span>R</span><span>回到赛道</span></div>
+      <div class="modal-mini"><span>P</span><span>继续 / 暂停</span><span>·</span><span>R</span><span>重新开始</span></div>
     </div>
   </section>
 
@@ -598,6 +604,7 @@ kbd{
     distance: document.getElementById("distanceValue"),
     bestHud: document.getElementById("bestHud"),
     coins: document.getElementById("coinValue"),
+    runCoinDelta: document.getElementById("runCoinDelta"),
     fuelPanel: document.getElementById("fuelPanel"),
     fuelFill: document.getElementById("fuelFill"),
     fuelValue: document.getElementById("fuelValue"),
@@ -755,6 +762,8 @@ kbd{
   /* ---------- terrain ---------- */
   function heightAt(x) {
     const d = x - START_X;
+    // A steep rise behind the start line closes the world off without a wall.
+    if (d < 0) return -Math.min(d * d * 0.35, 18);
     const ramp = smoothstep(7, 43, d);
     const difficulty = 0.82 + Math.min(Math.max(d, 0) / 2200, 1) * 0.38;
     const base =
@@ -895,28 +904,28 @@ kbd{
     el.pauseMuteBtn.textContent = muted ? "声音：关" : "声音：开";
   }
 
-  function chime(freq, duration, type, volume, slide) {
+  function chime(freq, duration, type, volume, slide, delay = 0) {
     if (!audio.ready || muted || !audio.ctx) return;
     const ac = audio.ctx;
-    const now = ac.currentTime;
+    const start = ac.currentTime + delay;
     const osc = ac.createOscillator();
     const gain = ac.createGain();
     osc.type = type || "sine";
-    osc.frequency.setValueAtTime(freq, now);
-    if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(24, slide), now + duration);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume || 0.04), now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.frequency.setValueAtTime(freq, start);
+    if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(24, slide), start + duration);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume || 0.04), start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     osc.connect(gain);
     gain.connect(audio.master);
-    osc.start(now);
-    osc.stop(now + duration + 0.03);
+    osc.start(start);
+    osc.stop(start + duration + 0.03);
   }
 
   function pickupSound(kind) {
     if (kind === "fuel") {
       chime(392, 0.16, "triangle", 0.05);
-      setTimeout(() => chime(587, 0.22, "triangle", 0.045), 90);
+      chime(587, 0.22, "triangle", 0.045, 0, 0.09);
     } else {
       const note = 620 + ((coins % 5) * 75);
       chime(note, 0.09, "triangle", 0.026);
@@ -1058,9 +1067,9 @@ kbd{
     }
   }
 
-  function resetRun(preserveRunCoins) {
+  function resetRun() {
     fuel = 100;
-    if (!preserveRunCoins) coins = 0;
+    coins = 0;
     distance = 0;
     emptyTimer = 0;
     emptyWarned = false;
@@ -1134,7 +1143,7 @@ kbd{
     initAudio();
   }
 
-  function endRun() {
+  function endRun(reason = "fuel") {
     if (state !== "playing") return;
     const finalDistance = Math.floor(distance);
     const record = finalDistance > save.best;
@@ -1149,10 +1158,17 @@ kbd{
     el.resultDistance.innerHTML = finalDistance + "<small>m</small>";
     el.resultCoins.textContent = String(coins);
     el.resultBest.innerHTML = save.best + "<small>m</small>";
-    el.overTitle.textContent = fuel <= 0 ? "油箱见底" : "赛段结束";
-    el.overCopy.textContent = record
-      ? "山脊替你记下了这一程。新的个人纪录，已经在路上。"
-      : "山脊替你收下了这一程。下一次，把发车点甩得更远。";
+    if (reason === "crash") {
+      el.overTitle.textContent = "翻车出局";
+      el.overCopy.textContent = record
+        ? "虽然失控翻覆，但山脊记住了你的新纪录！"
+        : "车身失控翻覆。稳住重心，下一程冲得更远。";
+    } else {
+      el.overTitle.textContent = "油箱见底";
+      el.overCopy.textContent = record
+        ? "山脊替你记下了这一程。新的个人纪录，已经在路上。"
+        : "山脊替你收下了这一程。下一次，把发车点甩得更远。";
+    }
     el.newRecord.hidden = !record;
     openOverlay(el.overOverlay, el.againBtn);
     updateHud(true);
@@ -1186,7 +1202,7 @@ kbd{
     car.crashTimer = 0;
     car.contactCount = 0;
     stuckTimer = 0;
-    emptyTimer = 0;
+    fuel = Math.max(5, fuel - 15);
     jump.airborne = false;
     jump.duration = 0;
     jump.tier = 0;
@@ -1198,25 +1214,8 @@ kbd{
     jump.calloutReward = 0;
     setFrameFx("off", 0, "#f0b15e", 0);
     hasTouchedGround = false;
-    addShake(0.45);
-    showToast(auto ? "回到山脊" : "回到赛道", "本程进度保留，继续向上");
-  }
-
-  function restartAfterCrash() {
-    const finalDistance = Math.floor(distance);
-    if (finalDistance > save.best) {
-      save.best = finalDistance;
-      persist();
-      updateBestUi();
-    }
-    resetRun(true);
-    clearPressed();
-    accumulator = 0;
-    snapCamera();
-    addShake(0.85);
-    spawnResetBurst();
-    setFrameFx("impact", 2, "#f0b15e", 1.05);
-    showToast("整备完成", "回到起点 · 纪录与金币已保留");
+    addShake(auto ? 0.45 : 0.28);
+    showToast("脱困整备", "消耗 15% 燃油 · 退回安全坡面");
   }
 
   /* ---------- particles ---------- */
@@ -1343,13 +1342,6 @@ kbd{
         phase: Math.random() * TAU,
       });
     }
-  }
-
-  function spawnResetBurst() {
-    spawnShockwave(car.x, car.y, "#f0b15e", 5.2);
-    spawnJumpBurst(car.x, car.y, 2, "#f0b15e");
-    spawnDust(car.x - 1, heightAt(car.x - 1), -1);
-    spawnDust(car.x + 1, heightAt(car.x + 1), 1);
   }
 
   function updateParticles(dt) {
@@ -1514,12 +1506,15 @@ kbd{
   function roofHitsGround() {
     const c = Math.cos(car.angle);
     const s = Math.sin(car.angle);
-    const roofY = -0.62;
-    const points = [-0.62, 0.58];
-    for (const lx of points) {
-      const wx = car.x + lx * c - roofY * s;
-      const wy = car.y + lx * s + roofY * c;
-      if (wy > heightAt(wx) - 0.015) return true;
+    const points = [
+      [-0.60, -0.62],
+      [0.04, -0.58],
+      [0.54, -0.60],
+    ];
+    for (const [lx, ly] of points) {
+      const wx = car.x + lx * c - ly * s;
+      const wy = car.y + lx * s + ly * c;
+      if (wy > heightAt(wx) - 0.02) return true;
     }
     return false;
   }
@@ -1539,8 +1534,8 @@ kbd{
     const gasHeld = readGas();
     const brakeHeld = readBrake();
     const canDrive = fuel > 0 && !car.crashed;
+    const brake = !car.crashed && brakeHeld;
     const throttle = canDrive && gasHeld && !brakeHeld;
-    const brake = !car.crashed && brakeHeld && !gasHeld;
 
     if (!car.crashed) {
       const speed = Math.abs(car.vx);
@@ -1573,7 +1568,7 @@ kbd{
       const pvy = car.vy + car.omega * rx;
       const vn = pvx * nx + pvy * ny;
       const vt = pvx * tx + pvy * ty;
-      const pen = wy + WHEEL_RADIUS - gy;
+      const pen = (wy - gy) * norm + WHEEL_RADIUS;
 
       car.wheelWorld[i].x = wx;
       car.wheelWorld[i].y = wy;
@@ -1610,10 +1605,58 @@ kbd{
       }
     }
 
-    if (car.contactCount === 0) {
-      if (gasHeld && !brakeHeld) alpha -= 4.15;
-      if (brakeHeld && !gasHeld) alpha += 4.15;
-      alpha -= car.omega * 0.26;
+    // Chassis probes: rear bumper, belly and front bumper act as a soft second
+    // line of defence so spikes and crests cannot clip straight through the body.
+    const bodyPoints = [
+      { lx: -1.48, ly: 0.24 },
+      { lx: 0.0, ly: 0.31 },
+      { lx: 1.52, ly: 0.18 },
+    ];
+    for (const bp of bodyPoints) {
+      const wx = car.x + bp.lx * cosA - bp.ly * sinA;
+      const wy = car.y + bp.lx * sinA + bp.ly * cosA;
+      const gy = heightAt(wx);
+      if (wy <= gy) continue;
+      const slope = slopeAt(wx);
+      const norm = 1 / Math.sqrt(1 + slope * slope);
+      const nx = slope * norm;
+      const ny = -norm;
+      const tx = norm;
+      const ty = slope * norm;
+      const bodyPen = (wy - gy) * norm;
+      car.x += nx * bodyPen * 0.45;
+      car.y += ny * bodyPen * 0.45;
+      const rx = wx - car.x;
+      const ry = wy - car.y;
+      const pvx = car.vx - car.omega * ry;
+      const pvy = car.vy + car.omega * rx;
+      const vn = pvx * nx + pvy * ny;
+      if (vn < 0) {
+        const fn = Math.min(46000, Math.max(0, bodyPen * 16000 - vn * 1200));
+        ax += (nx * fn) / CAR_MASS;
+        ay += (ny * fn) / CAR_MASS;
+        alpha += (rx * ny * fn - ry * nx * fn) / CAR_INERTIA;
+        const vt = pvx * tx + pvy * ty;
+        const scrape = Math.min(Math.abs(vt) * 1.6, 9);
+        ax -= tx * Math.sign(vt) * scrape;
+        ay -= ty * Math.sign(vt) * scrape;
+        if (vn < -2.2) {
+          spawnPickup(wx, gy, "#f0b15e");
+          addShake(0.22);
+        }
+      }
+    }
+
+    if (car.contactCount === 0 && !car.crashed) {
+      const airTorque = canDrive ? 4.15 : 0.95; // 没油时仅保留微弱重心调节
+      if (gasHeld && !brakeHeld) alpha -= airTorque;
+      if (brakeHeld && !gasHeld) alpha += airTorque;
+      if (gasHeld && brakeHeld) {
+        // 双踏板同时按住：空中姿态稳定器（大幅增加角速度阻尼）
+        alpha -= car.omega * 2.8;
+      } else {
+        alpha -= car.omega * 0.26;
+      }
     } else {
       alpha -= car.omega * 0.7;
     }
@@ -1629,9 +1672,15 @@ kbd{
     car.y += car.vy * dt;
     car.angle += car.omega * dt;
 
-    if (car.contactCount > 0) {
+    const MIN_X = START_X - 4.5;
+    if (car.x < MIN_X) {
+      car.x = MIN_X;
+      if (car.vx < 0) car.vx = -car.vx * 0.2;
+    }
+
+    if (car.contactCount > 0 && !car.crashed) {
       stuckTimer = Math.abs(car.vx) < 0.35 && (throttle || brake) ? stuckTimer + dt : 0;
-      if (stuckTimer > 5.2) {
+      if (stuckTimer > 4.0 && fuel > 15) {
         respawn(true);
       }
     } else {
@@ -1669,12 +1718,12 @@ kbd{
       spawnShockwave(car.x, car.y, "#eb633a", 5.5);
       spawnJumpBurst(car.x, car.y, 2, "#eb633a");
       crashSound();
-      showToast("翻车了", "正在整备，马上回到起点");
+      showToast("翻车失控", "本程即将结算");
     }
 
     if (car.crashed) {
       car.crashTimer += dt;
-      if (car.crashTimer > 1.5) restartAfterCrash();
+      if (car.crashTimer > 1.35) endRun("crash");
     }
 
     if (car.contactCount > 0 && (throttle || brake) && Math.random() < dt * 28) {
@@ -1685,7 +1734,7 @@ kbd{
       }
     }
 
-    if (throttle || (gasHeld && car.contactCount === 0)) {
+    if (throttle || (canDrive && gasHeld && car.contactCount === 0)) {
       exhaustTimer -= dt;
       if (exhaustTimer <= 0) {
         spawnExhaust();
@@ -1704,14 +1753,14 @@ kbd{
       lowFuelWarned = true;
       showToast("燃油告急", "寻找下一个红色油桶");
     }
-    if (fuel <= 0) {
+    if (fuel <= 0 && !car.crashed) {
       emptyTimer += dt;
       if (!emptyWarned) {
         emptyWarned = true;
         showToast("燃油耗尽", "靠惯性寻找下坡");
       }
       const speed = Math.hypot(car.vx, car.vy);
-      if ((speed < 0.9 && emptyTimer > 1.4) || emptyTimer > 15) endRun();
+      if ((speed < 0.9 && emptyTimer > 1.4) || emptyTimer > 15) endRun("fuel");
     }
 
   }
@@ -1738,6 +1787,13 @@ kbd{
     if (force || save.coins !== lastHud.coins) {
       el.coins.textContent = String(save.coins);
       lastHud.coins = save.coins;
+    }
+    if (state === "playing" && coins > 0) {
+      const delta = "+" + coins;
+      if (el.runCoinDelta.textContent !== delta) el.runCoinDelta.textContent = delta;
+      el.runCoinDelta.classList.remove("is-hidden");
+    } else {
+      el.runCoinDelta.classList.add("is-hidden");
     }
     const f = Math.ceil(fuel);
     if (force || f !== lastHud.fuel) {
@@ -2717,6 +2773,7 @@ kbd{
         accumulator -= GOAL_STEP;
         steps++;
       }
+      if (steps === 6) accumulator = 0;
     } else {
       updateParticles(dt);
     }
@@ -2767,13 +2824,9 @@ kbd{
       return;
     }
     if (code === "KeyR") {
-      if (state === "playing") {
+      if (state === "playing" || state === "paused") {
         e.preventDefault();
-        respawn(false);
-      } else if (state === "paused") {
-        e.preventDefault();
-        resumeGame();
-        respawn(false);
+        startRun();
       }
       return;
     }
