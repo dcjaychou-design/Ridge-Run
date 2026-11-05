@@ -57,6 +57,8 @@ npm run preview   # 本地预览构建结果
 
 `vite.config.ts` 使用 `base: "./"`，`dist/` 可直接部署到 GitHub Pages、 itch.io 或任意静态托管目录。
 
+推送到 `main` 后，`.github/workflows/deploy.yml` 会自动执行 `npm ci && npm run build`，并通过 GitHub Pages Actions 发布 `dist/`；仓库本身不需要提交构建产物。
+
 ## 技术
 
 Vite + TypeScript，严格模式；Canvas 2D 绘制全部场景与三款载具，Web Audio API 合成引擎与音效，无运行时依赖（仅从 Google Fonts 加载字体）。
