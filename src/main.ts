@@ -2,17 +2,39 @@ import { AudioController } from "./audio/AudioController";
 import {
   CHUNK,
   CRASH_SETTLE_TIME,
+  FLIP_REWARD,
+  FLIP_TOLERANCE,
   FUEL_PICKUP_AMOUNT,
   GOAL_STEP,
   JUMP_STAGES,
   LOW_FUEL_RATIO,
+  MAGNET_DURATION,
+  MAGNET_MAX_TIME,
+  MAGNET_RADIUS,
+  MAX_NITRO_TIME,
+  NITRO_FLIP_TIME,
+  NITRO_PERFECT_TIME,
+  NITRO_PICKUP_TIME,
+  PERFECT_ANGLE,
+  PERFECT_MAX_COMBO,
+  PERFECT_MIN_AIR,
   RESPAWN_FUEL_COST,
   START_X,
   VEHICLES,
+  WHEELIE_ANGLE,
+  WHEELIE_INTERVAL,
+  WHEELIE_MIN_SPEED,
+  WHEELIE_REWARD,
+  WHEELIE_START,
   deriveVehicleStats,
 } from "./constants";
+import {
+  biomePaletteAt,
+  stageInfoAt,
+  surfaceAt,
+} from "./physics/biomes";
 import { VehiclePhysics } from "./physics/VehiclePhysics";
-import { heightAt } from "./physics/terrain";
+import { heightAt, slopeAt } from "./physics/terrain";
 import { AtmosphereRenderer } from "./render/AtmosphereRenderer";
 import { ItemRenderer } from "./render/ItemRenderer";
 import { JumpFxRenderer } from "./render/JumpFxRenderer";
@@ -97,9 +119,11 @@ let emptyWarned = false;
 let lowFuelWarned = false;
 let stuckTimer = 0;
 let exhaustTimer = 0;
+let nitroExhaustTimer = 0;
 let hasTouchedGround = false;
 let chunkCursor = 0;
 let items: Item[] = [];
+let lastStageGlobal = 0;
 
 const jump: JumpState = {
   airborne: false,
@@ -112,6 +136,15 @@ const jump: JumpState = {
   calloutTime: 0,
   calloutTier: 0,
   calloutReward: 0,
+  airRotation: 0,
+  flipsCompleted: 0,
+  wheelieTime: 0,
+  wheelieTick: 0,
+  perfectCombo: 0,
+  nitroTime: 0,
+  magnetTime: 0,
+  stuntTitle: "",
+  stuntSubtitle: "",
 };
 
 const frameFx: FrameFxState = {
@@ -177,10 +210,12 @@ function targetCamera(): CameraState {
   }
   const look = clamp(renderCar.vx * 0.4, -visW * 0.17, visW * 0.22);
   const speedZoom = 1 - clamp(Math.abs(renderCar.vx) / 92, 0, 0.1);
+  const nitroZoom =
+    jump.nitroTime > 0 && !renderCar.crashed ? 0.94 : 1;
   return {
     x: renderCar.x + look,
     y: renderCar.y - visH * 0.13,
-    scale: baseScale * speedZoom,
+    scale: baseScale * speedZoom * nitroZoom,
   };
 }
 
@@ -259,10 +294,13 @@ function syncRenderCar(): void {
 function generateChunk(chunk: number): void {
   const rng = mulberry32((chunk + 7) * 0x9e3779b1);
   const baseX = START_X + chunk * CHUNK;
+  let coinStart = Number.POSITIVE_INFINITY;
+  let fuelX = Number.POSITIVE_INFINITY;
 
   if (chunk % 2 === 1) {
     const count = 3 + Math.floor(rng() * 3);
     const start = baseX + 7 + rng() * 15;
+    coinStart = start;
     const lift = 1.08 + rng() * 0.5;
     for (let i = 0; i < count; i++) {
       const x = start + i * 3.15;
@@ -271,6 +309,8 @@ function generateChunk(chunk: number): void {
         type: "coin",
         x,
         y: heightAt(x) - lift - arc,
+        vx: 0,
+        vy: 0,
         phase: rng() * TAU,
         alive: true,
       });
@@ -279,13 +319,48 @@ function generateChunk(chunk: number): void {
 
   if (chunk === 1 || (chunk > 3 && chunk % 4 === 1)) {
     const x = baseX + 13 + rng() * 17;
+    fuelX = x;
     items.push({
       type: "fuel",
       x,
       y: heightAt(x) - 1.15,
+      vx: 0,
+      vy: 0,
       phase: rng() * TAU,
       alive: true,
     });
+  }
+
+  // Turbo cylinder: from the 2nd chunk onward, in the climb-in section.
+  if (chunk >= 1 && rng() < 0.35) {
+    const x = baseX + 4 + rng() * 11;
+    if (Math.abs(x - fuelX) > 5.5) {
+      items.push({
+        type: "nitro",
+        x,
+        y: heightAt(x) - 1.2,
+        vx: 0,
+        vy: 0,
+        phase: rng() * TAU,
+        alive: true,
+      });
+    }
+  }
+
+  // Magnet beacon: just ahead of a coin ribbon, so it charges before the arc.
+  if (Number.isFinite(coinStart) && rng() < 0.25) {
+    const x = Math.max(baseX + 3, coinStart - 8 - rng() * 4);
+    if (Math.abs(x - fuelX) > 5.5) {
+      items.push({
+        type: "magnet",
+        x,
+        y: heightAt(x) - 1.55,
+        vx: 0,
+        vy: 0,
+        phase: rng() * TAU,
+        alive: true,
+      });
+    }
   }
 }
 
@@ -319,6 +394,13 @@ function beginJump(): void {
   jump.airborne = true;
   jump.duration = 0;
   jump.tier = 0;
+  jump.airRotation = 0;
+  jump.flipsCompleted = 0;
+  jump.wheelieTime = 0;
+  jump.wheelieTick = 0;
+  jump.calloutTime = 0;
+  jump.stuntTitle = "";
+  jump.stuntSubtitle = "";
   jump.flash = 0.46;
   jump.flashColor = "#f0b15e";
   jump.landing = 0;
@@ -341,6 +423,8 @@ function triggerJumpTier(tier: JumpTier): void {
   jump.calloutTime = 1.05;
   jump.calloutTier = tier;
   jump.calloutReward = 0;
+  jump.stuntTitle = "";
+  jump.stuntSubtitle = "";
   setFrameFx("air", tier, stage.color, 0.58);
   addShake(0.36 * scale);
   particles.spawnShockwave(car.x, car.y, stage.color, 3.6 + tier * 1.8);
@@ -349,43 +433,156 @@ function triggerJumpTier(tier: JumpTier): void {
   hud.showToast(stage.title, `落地结算 +${stage.reward} 金币`);
 }
 
+function triggerFlip(totalFlips: number): void {
+  jump.flash = 0.24;
+  jump.flashColor = "#ffe9a8";
+  setFrameFx("air", Math.min(3, totalFlips + 1) as JumpTier, "#ffe9a8", 0.68);
+  addShake(0.34);
+  particles.spawnShockwave(
+    car.x,
+    car.y,
+    "#ffe9a8",
+    3.8 + totalFlips * 1.4,
+  );
+  particles.spawnJumpBurst(
+    car.x,
+    car.y,
+    Math.min(3, totalFlips + 1),
+    "#ffe9a8",
+  );
+  audio.flip();
+}
+
+function grantCoins(amount: number): void {
+  if (amount <= 0) return;
+  runCoins += amount;
+  save.coins += amount;
+  persistSave(save);
+  hud.bumpCoins();
+}
+
 function finishJump(): void {
   const tier = jump.tier;
   const stage = tier ? JUMP_STAGES[(tier - 1) as number]! : null;
-  const color = stage ? stage.color : "#f0b15e";
+  const baseColor = stage ? stage.color : "#f0b15e";
+  const duration = jump.duration;
+  const flips = jump.flipsCompleted;
+  const airRotation = jump.airRotation;
+
   jump.airborne = false;
   jump.landing = tier ? 0.86 : 0.34;
   jump.landingTier = tier;
   jump.flash = tier ? 0.24 : 0.1;
-  jump.flashColor = color;
   jump.calloutTime = tier ? 1.2 : 0;
   jump.calloutTier = tier;
-  jump.calloutReward = stage ? stage.reward : 0;
+  jump.wheelieTime = 0;
+  jump.wheelieTick = 0;
+
+  let reward = 0;
+  let flashColor = baseColor;
+  const details: string[] = [];
+  let toastMain = "";
+
+  if (stage) {
+    reward += stage.reward;
+    toastMain = `${stage.title} +${stage.reward}`;
+  }
+
+  if (!car.crashed) {
+    if (flips > 0) {
+      const flipReward = FLIP_REWARD * flips;
+      reward += flipReward;
+      jump.nitroTime = Math.min(
+        MAX_NITRO_TIME,
+        jump.nitroTime + NITRO_FLIP_TIME,
+      );
+      const direction = airRotation > 0 ? "前空翻" : "后空翻";
+      toastMain = `${direction} ×${flips} · +${flipReward} 金币`;
+      jump.stuntTitle = `${direction} ×${flips}`;
+      jump.stuntSubtitle = `+${flipReward} 金币 · 氮气 +${NITRO_FLIP_TIME.toFixed(1)}s`;
+      details.push(`落地补发氮气 +${NITRO_FLIP_TIME.toFixed(1)}s`);
+      particles.spawnCoinReward(
+        car.x,
+        car.y - 0.7,
+        Math.min(16, flipReward),
+      );
+      particles.spawnShockwave(car.x, car.y, "#ffe9a8", 4.8 + flips * 1.4);
+    }
+
+    const slopeAngle = Math.atan(slopeAt(car.x));
+    const angleDiff = Math.abs(
+      Math.atan2(
+        Math.sin(car.angle - slopeAngle),
+        Math.cos(car.angle - slopeAngle),
+      ),
+    );
+    if (duration >= PERFECT_MIN_AIR) {
+      if (angleDiff < PERFECT_ANGLE) {
+        jump.perfectCombo = Math.min(
+          PERFECT_MAX_COMBO,
+          jump.perfectCombo + 1,
+        );
+        const perfectReward = 5 * jump.perfectCombo;
+        reward += perfectReward;
+        jump.nitroTime = Math.min(
+          MAX_NITRO_TIME,
+          jump.nitroTime + NITRO_PERFECT_TIME,
+        );
+        car.vx += 1.2;
+        toastMain = toastMain
+          ? `${toastMain} · 完美落地 ×${jump.perfectCombo}`
+          : `完美落地 ×${jump.perfectCombo}`;
+        if (jump.stuntTitle) {
+          jump.stuntSubtitle = `${jump.stuntSubtitle} · 完美落地 ×${jump.perfectCombo}`;
+        } else {
+          jump.stuntTitle = `完美落地 ×${jump.perfectCombo}`;
+          jump.stuntSubtitle = `+${perfectReward} 金币 · 氮气充能`;
+        }
+        details.push(`+${perfectReward} 金币 · 氮气充能`);
+        flashColor = "#89d8c8";
+        particles.spawnShockwave(
+          car.x,
+          heightAt(car.x) - 0.04,
+          "#89d8c8",
+          4.4 + jump.perfectCombo * 0.9,
+        );
+        audio.nitro();
+        addShake(0.3);
+      } else {
+        jump.perfectCombo = 0;
+      }
+    }
+  }
+
+  jump.flashColor = flashColor;
+  jump.calloutReward = reward;
   setFrameFx(
     "impact",
     tier,
-    color,
+    flashColor,
     tier === 3 ? 1.3 : tier === 2 ? 1.05 : tier === 1 ? 0.72 : 0.34,
   );
   particles.spawnShockwave(
     car.x,
     heightAt(car.x) - 0.04,
-    color,
+    flashColor,
     tier ? 4 + tier * 2.2 : 2.6,
   );
-  particles.spawnLandingBurst(car.x, heightAt(car.x), tier, color);
+  particles.spawnLandingBurst(car.x, heightAt(car.x), tier, flashColor);
   addShake(tier === 3 ? 1.12 : tier === 2 ? 0.78 : tier === 1 ? 0.48 : 0.22);
-  if (stage) {
-    runCoins += stage.reward;
-    save.coins += stage.reward;
-    persistSave(save);
-    particles.spawnCoinReward(car.x, car.y - 0.7, stage.reward);
+  audio.landing(tier);
+
+  if (reward > 0) {
+    grantCoins(reward);
+    particles.spawnCoinReward(car.x, car.y - 0.7, Math.min(20, reward));
     audio.coinPickup(runCoins);
-    hud.bumpCoins();
-    hud.showToast(`${stage.title} +${stage.reward}`, "完美落地 · 金币已入账");
+    hud.showToast(toastMain, details.join(" · ") || "金币已入账");
   }
+
   jump.duration = 0;
   jump.tier = 0;
+  jump.airRotation = 0;
+  jump.flipsCompleted = 0;
 }
 
 function collectItem(item: Item): void {
@@ -399,16 +596,47 @@ function collectItem(item: Item): void {
     hud.bumpCoins();
     return;
   }
-  fuel = Math.min(stats.fuelCapacity, fuel + FUEL_PICKUP_AMOUNT);
-  emptyTimer = 0;
-  emptyWarned = false;
-  lowFuelWarned = false;
-  audio.fuelPickup();
-  particles.spawnPickup(item.x, item.y, "#ffd08a");
-  hud.showToast(`燃油 +${FUEL_PICKUP_AMOUNT}`, "继续向山脊深处");
+  if (item.type === "fuel") {
+    fuel = Math.min(stats.fuelCapacity, fuel + FUEL_PICKUP_AMOUNT);
+    emptyTimer = 0;
+    emptyWarned = false;
+    lowFuelWarned = false;
+    audio.fuelPickup();
+    particles.spawnPickup(item.x, item.y, "#ffd08a");
+    hud.showToast(`燃油 +${FUEL_PICKUP_AMOUNT}`, "继续向山脊深处");
+    return;
+  }
+  if (item.type === "nitro") {
+    jump.nitroTime = Math.min(
+      MAX_NITRO_TIME,
+      jump.nitroTime + NITRO_PICKUP_TIME,
+    );
+    audio.nitro();
+    particles.spawnPickup(item.x, item.y, "#89d8c8");
+    particles.spawnShockwave(item.x, item.y, "#89d8c8", 2.6);
+    addShake(0.18);
+    hud.showToast("涡轮充能", `强力推进 · NITRO ${NITRO_PICKUP_TIME.toFixed(1)}s`);
+    return;
+  }
+  jump.magnetTime = Math.min(
+    MAGNET_MAX_TIME,
+    jump.magnetTime + MAGNET_DURATION,
+  );
+  audio.magnet();
+  particles.spawnPickup(item.x, item.y, "#f0b15e");
+  particles.spawnShockwave(item.x, item.y, "#f0b15e", 3.2);
+  addShake(0.22);
+  hud.showToast("磁铁信标", `引力场展开 · ${MAGNET_DURATION.toFixed(0)}s`);
 }
 
-function updateItems(): void {
+function pickupRadius(type: Item["type"]): number {
+  if (type === "fuel") return 1.95;
+  if (type === "coin") return 1.55;
+  return 1.9;
+}
+
+function updateItems(dt: number): void {
+  const magnetActive = jump.magnetTime > 0 && !car.crashed;
   let pruned = false;
   for (const item of items) {
     if (!item.alive) {
@@ -421,9 +649,27 @@ function updateItems(): void {
       continue;
     }
     if (!car.crashed) {
+      if (magnetActive && item.type === "coin") {
+        const dx = car.x - item.x;
+        const dy = car.y - item.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < MAGNET_RADIUS && dist > 0.001) {
+          const pull = 30 + (MAGNET_RADIUS - dist) * 8;
+          const k = 1 - Math.exp(-dt * 10);
+          item.vx += ((dx / dist) * pull - item.vx) * k;
+          item.vy += ((dy / dist) * pull - item.vy) * k;
+        }
+      }
+      if (item.vx !== 0 || item.vy !== 0) {
+        item.x += item.vx * dt;
+        item.y += item.vy * dt;
+        const damp = Math.exp(-dt * 1.8);
+        item.vx *= damp;
+        item.vy *= damp;
+      }
       const dx = item.x - car.x;
       const dy = item.y - car.y;
-      const radius = item.type === "fuel" ? 1.95 : 1.55;
+      const radius = pickupRadius(item.type);
       if (dx * dx + dy * dy < radius * radius) collectItem(item);
     }
   }
@@ -447,7 +693,9 @@ function resetRun(): void {
   lowFuelWarned = false;
   stuckTimer = 0;
   exhaustTimer = 0;
+  nitroExhaustTimer = 0;
   hasTouchedGround = false;
+  lastStageGlobal = 0;
 
   jump.airborne = false;
   jump.duration = 0;
@@ -459,6 +707,15 @@ function resetRun(): void {
   jump.calloutTime = 0;
   jump.calloutTier = 0;
   jump.calloutReward = 0;
+  jump.airRotation = 0;
+  jump.flipsCompleted = 0;
+  jump.wheelieTime = 0;
+  jump.wheelieTick = 0;
+  jump.perfectCombo = 0;
+  jump.nitroTime = 0;
+  jump.magnetTime = 0;
+  jump.stuntTitle = "";
+  jump.stuntSubtitle = "";
   frameFx.mode = "off";
   frameFx.airborne = false;
   frameFx.tier = 0;
@@ -476,6 +733,7 @@ function resetRun(): void {
 }
 
 function snapshot(): HudSnapshot {
+  const stage = stageInfoAt(distance);
   return {
     distance,
     best: save.best,
@@ -486,6 +744,12 @@ function snapshot(): HudSnapshot {
     speed: car.vx,
     playing: state === "playing",
     crashed: car.crashed,
+    stageLabel: stage.stageLabel,
+    stageName: stage.name,
+    stageAccent: stage.accent,
+    nitro: jump.nitroTime,
+    magnet: jump.magnetTime,
+    combo: jump.perfectCombo,
   };
 }
 
@@ -573,11 +837,50 @@ function respawn(auto: boolean): void {
   jump.calloutTime = 0;
   jump.calloutTier = 0;
   jump.calloutReward = 0;
+  jump.airRotation = 0;
+  jump.flipsCompleted = 0;
+  jump.wheelieTime = 0;
+  jump.wheelieTick = 0;
+  jump.stuntTitle = "";
+  jump.stuntSubtitle = "";
   setFrameFx("off", 0, "#f0b15e", 0);
   hasTouchedGround = false;
   snapVisualCar();
   addShake(auto ? 0.45 : 0.28);
   hud.showToast("脱困整备", `消耗 ${RESPAWN_FUEL_COST}% 燃油 · 退回安全坡面`);
+}
+
+/** Front wheel up, rear wheel down, nose held above the local slope. */
+function updateWheelie(dt: number): void {
+  const frontContact = car.contact[car.contact.length - 1] === true;
+  const rearContact = car.contact[0] === true;
+  const slopeAngle = Math.atan(slopeAt(car.x));
+  const pitch = slopeAngle - car.angle;
+  const balancing =
+    !car.crashed &&
+    !jump.airborne &&
+    car.contactCount > 0 &&
+    Math.abs(car.vx) > WHEELIE_MIN_SPEED &&
+    !frontContact &&
+    rearContact &&
+    pitch > WHEELIE_ANGLE;
+
+  if (!balancing) {
+    jump.wheelieTime = 0;
+    jump.wheelieTick = 0;
+    return;
+  }
+
+  jump.wheelieTime += dt;
+  if (jump.wheelieTime < WHEELIE_START) return;
+  jump.wheelieTick += dt;
+  if (jump.wheelieTick < WHEELIE_INTERVAL) return;
+  jump.wheelieTick -= WHEELIE_INTERVAL;
+  grantCoins(WHEELIE_REWARD);
+  const rear = car.wheelWorld[0]!;
+  particles.spawnWheelieSpark(rear.x, heightAt(rear.x));
+  audio.coinPickup(runCoins);
+  hud.showToast(`单轮平衡 +${WHEELIE_REWARD}`, "后轮着地摩擦火花");
 }
 
 /* ---------- fixed-step simulation ---------- */
@@ -586,6 +889,8 @@ function simulate(dt: number): void {
   jump.flash = Math.max(0, jump.flash - dt);
   jump.landing = Math.max(0, jump.landing - dt);
   jump.calloutTime = Math.max(0, jump.calloutTime - dt);
+  jump.nitroTime = Math.max(0, jump.nitroTime - dt);
+  jump.magnetTime = Math.max(0, jump.magnetTime - dt);
   if (!frameFx.airborne && frameFx.pulse > 0) {
     frameFx.pulse = Math.max(0, frameFx.pulse - dt);
     if (frameFx.pulse === 0) setFrameFx("off", 0, frameFx.color, 0);
@@ -596,6 +901,7 @@ function simulate(dt: number): void {
   const canDrive = fuel > 0 && !car.crashed;
   const brake = !car.crashed && brakeHeld;
   const throttle = canDrive && gasHeld && !brakeHeld;
+  const nitroActive = jump.nitroTime > 0 && !car.crashed;
 
   if (!car.crashed) {
     const speed = Math.abs(car.vx);
@@ -616,6 +922,7 @@ function simulate(dt: number): void {
     dt,
     { throttle, brake, gasHeld, brakeHeld, canDrive },
     stats,
+    { nitro: nitroActive },
   );
 
   for (const impact of events.impacts) {
@@ -635,6 +942,14 @@ function simulate(dt: number): void {
   if (!groundedNow && events.wasGrounded && hasTouchedGround) beginJump();
   if (!groundedNow && jump.airborne) {
     jump.duration += dt;
+    jump.airRotation += car.omega * dt;
+    const totalFlips = Math.floor(
+      (Math.abs(jump.airRotation) + FLIP_TOLERANCE) / TAU,
+    );
+    if (totalFlips > jump.flipsCompleted) {
+      jump.flipsCompleted = totalFlips;
+      triggerFlip(totalFlips);
+    }
     while (jump.tier < JUMP_STAGES.length) {
       const stage = JUMP_STAGES[jump.tier as number]!;
       if (jump.duration + 0.000001 < stage.time) break;
@@ -649,12 +964,21 @@ function simulate(dt: number): void {
     particles.spawnDust(car.x + 0.75, car.y + 0.45, 1, car.vx);
   }
   if (groundedNow) hasTouchedGround = true;
+  updateWheelie(dt);
 
   if (events.crashed) {
     addShake(1.05);
     jump.airborne = false;
     jump.duration = 0;
     jump.tier = 0;
+    jump.airRotation = 0;
+    jump.flipsCompleted = 0;
+    jump.wheelieTime = 0;
+    jump.wheelieTick = 0;
+    jump.perfectCombo = 0;
+    jump.stuntTitle = "";
+    jump.stuntSubtitle = "";
+    jump.calloutTime = 0;
     jump.flash = 0.4;
     jump.flashColor = "#eb633a";
     setFrameFx("crash", 2, "#eb633a", 1.5);
@@ -682,10 +1006,31 @@ function simulate(dt: number): void {
     }
   }
 
+  if (car.contactCount > 0 && !car.crashed && Math.abs(car.vx) > 2) {
+    const surface = surfaceAt(car.x, stats.gripFactor);
+    if (surface.kind === "mud" && Math.random() < dt * 28) {
+      const rear = car.wheelWorld[0]!;
+      particles.spawnMud(rear.x, rear.y + 0.28, -1, car.vx);
+    } else if (surface.kind === "ice" && Math.random() < dt * 12) {
+      const rear = car.wheelWorld[0]!;
+      particles.spawnSnowSpray(rear.x, rear.y + 0.24, -1, car.vx);
+    }
+  }
+
+  if (nitroActive) {
+    nitroExhaustTimer -= dt;
+    if (nitroExhaustTimer <= 0) {
+      particles.spawnNitroFlame(car, physics.vehicle, 1);
+      nitroExhaustTimer = 0.016 + Math.random() * 0.012;
+    }
+  } else {
+    nitroExhaustTimer = 0;
+  }
+
   if (throttle || (canDrive && gasHeld && car.contactCount === 0)) {
     exhaustTimer -= dt;
     if (exhaustTimer <= 0) {
-      particles.spawnExhaust(car);
+      particles.spawnExhaust(car, physics.vehicle);
       exhaustTimer = 0.055 + Math.random() * 0.05;
     }
   }
@@ -693,7 +1038,13 @@ function simulate(dt: number): void {
   car.maxX = Math.max(car.maxX, car.x);
   distance = Math.max(distance, car.maxX - START_X);
 
-  updateItems();
+  const stage = stageInfoAt(distance);
+  if (stage.globalStage > lastStageGlobal) {
+    lastStageGlobal = stage.globalStage;
+    hud.showToast(`进入赛段 · ${stage.name}`, stage.hint);
+  }
+
+  updateItems(dt);
   ensureChunksAhead();
   particles.update(dt);
 
@@ -719,14 +1070,26 @@ function render(time: number): void {
   ctx.clearRect(0, 0, W, H);
 
   makeView(time);
-  const rc: RenderContext = { ctx, width: W, height: H, view, time };
+  const stage = stageInfoAt(distance);
+  const palette = biomePaletteAt(distance);
+  const rc: RenderContext = {
+    ctx,
+    width: W,
+    height: H,
+    view,
+    time,
+    stage,
+    palette,
+  };
   skyRenderer.draw(rc);
   mountainRenderer.draw(rc, camera.x);
   terrainRenderer.draw(rc);
+  terrainRenderer.drawVents(rc);
   terrainRenderer.drawMarkers(rc);
   itemRenderer.draw(rc, items);
   particles.draw(rc, false);
   jumpFxRenderer.drawAura(rc, renderCar, jump);
+  jumpFxRenderer.drawMagnetAura(rc, renderCar, jump);
   vehicleRenderer.draw(rc, renderCar, physics.vehicle);
   particles.draw(rc, true);
   atmosphereRenderer.drawMotes(rc);
@@ -763,6 +1126,7 @@ function frame(now: number): void {
     state === "playing" && !car.crashed,
     readGas(),
     Math.abs(car.vx),
+    state === "playing" && jump.nitroTime > 0 && !car.crashed,
   );
   if (garage.isOpen) garage.tick(now / 1000);
 }

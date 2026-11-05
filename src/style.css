@@ -125,6 +125,19 @@ svg{display:block}
 .distance-unit{font-family:var(--mono);font-size:11px;color:var(--paper-dim);letter-spacing:.06em}
 .best-line{margin-top:5px;font-size:8px;color:rgba(244,232,210,.45);letter-spacing:.15em}
 .best-line b{font-weight:500;color:rgba(244,232,210,.72)}
+.stage-chip{
+  --stage-accent:var(--amber);
+  margin-top:7px;display:inline-flex;align-items:center;gap:6px;padding:3px 8px;
+  border:1px solid rgba(244,232,210,.14);background:rgba(5,15,12,.46);
+  font-family:var(--mono);font-size:8px;font-weight:500;letter-spacing:.12em;
+  color:rgba(244,232,210,.68);white-space:nowrap;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:border-color .5s ease,color .5s ease;
+}
+.stage-chip::before{
+  content:"";width:4px;height:4px;border-radius:50%;flex:none;
+  background:var(--stage-accent);box-shadow:0 0 8px var(--stage-accent);
+}
 .hud-right{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:auto;filter:drop-shadow(0 2px 12px rgba(0,0,0,.35))}
 .hud-tools{display:flex;align-items:center;gap:6px}
 .coin-chip{
@@ -170,6 +183,27 @@ body.is-muted .mute-slash{opacity:1}
 }
 .fuel-panel.is-low{border-color:rgba(235,99,58,.45);background:rgba(50,13,7,.52)}
 .fuel-panel.is-low .fuel-fill{background:var(--signal)}
+.buff-bar{display:flex;flex-direction:column;align-items:stretch;gap:4px;width:168px;margin-top:7px}
+.buff{
+  display:grid;grid-template-columns:auto minmax(22px,1fr) auto;align-items:center;gap:6px;
+  padding:3px 7px;border:1px solid var(--line-soft);background:var(--glass);
+  font-family:var(--mono);font-size:7px;letter-spacing:.12em;color:var(--paper-dim);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.buff-label{font-weight:500}
+.buff-track{display:block;height:3px;background:rgba(244,232,210,.14);overflow:hidden}
+.buff-track i{display:block;height:100%;transform-origin:left center;transform:scaleX(0);transition:transform .1s linear}
+.buff-time{font-size:7px;font-variant-numeric:tabular-nums;color:inherit;opacity:.82}
+.buff--nitro{border-color:rgba(137,216,200,.34);color:#bff3e8}
+.buff--nitro .buff-track i{background:linear-gradient(90deg,#5fb8a8,#eafff7);box-shadow:0 0 10px rgba(137,216,200,.5)}
+.buff--magnet{border-color:rgba(240,177,94,.34);color:#f6d7a4}
+.buff--magnet .buff-track i{background:linear-gradient(90deg,#c9823f,#fff0bd)}
+.combo-chip{
+  align-self:flex-end;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;
+  border:1px solid rgba(240,177,94,.42);background:rgba(240,177,94,.1);
+  font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.14em;color:var(--amber);
+}
+.combo-chip b{font-weight:700;font-size:13px;letter-spacing:.04em}
 
 /* ---------- pedals / speed ---------- */
 .controls{
@@ -509,6 +543,12 @@ kbd{
   .distance-block{justify-self:start;align-items:flex-start;text-align:left}
   .distance-value{font-size:33px}
   .best-line{font-size:7px}
+  .stage-chip{font-size:7px;letter-spacing:.07em;margin-top:5px;padding:2px 6px;gap:5px}
+  .buff-bar{width:137px;gap:3px;margin-top:5px}
+  .buff{font-size:6.5px;padding:2px 5px;gap:5px;letter-spacing:.08em}
+  .buff-time{font-size:6.5px}
+  .combo-chip{font-size:10px;padding:2px 6px}
+  .combo-chip b{font-size:12px}
   .hud-right{gap:7px}
   .hud-tools{gap:5px}
   .coin-chip{height:38px;padding:0 9px;font-size:10px}
@@ -522,7 +562,7 @@ kbd{
   .speedo{bottom:calc(16px + env(safe-area-inset-bottom,0px));width:96px}
   .speed-value{font-size:23px}
   .speed-label{font-size:7px}
-  .toast{top:calc(103px + env(safe-area-inset-top,0px));padding:8px 11px;max-width:calc(100vw - 32px);white-space:normal}
+  .toast{top:calc(158px + env(safe-area-inset-top,0px));padding:8px 11px;max-width:calc(100vw - 32px);white-space:normal}
   .toast strong{font-size:10px}
   .toast span{font-size:7px}
   .modal h2{font-size:clamp(38px,12vw,58px)}

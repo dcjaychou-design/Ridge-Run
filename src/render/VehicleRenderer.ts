@@ -35,11 +35,117 @@ export class VehicleRenderer {
 
     if (sx < -160 || sx > W + 160 || sy < -160 || sy > H + 160) return;
 
+    const night = rc.palette.nightFactor;
+    if (night > 0.05 && !car.crashed) {
+      this.drawHeadlightPool(rc, car, config, night);
+    }
+
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(car.angle);
     ctx.scale(s, s);
+    if (night > 0.05 && !car.crashed) {
+      this.drawHeadlightCone(ctx, config, night, time);
+    }
     this.drawMachine(ctx, config, car.wheelSpin, time);
+    ctx.restore();
+  }
+
+  /** Warm pool on the ridge ahead so the beam actually reads as lighting. */
+  private drawHeadlightPool(
+    rc: RenderContext,
+    car: CarState,
+    config: VehicleConfig,
+    night: number,
+  ): void {
+    const { ctx } = rc;
+    const s = rc.view.scale;
+    const ahead = 5.6;
+    const c = Math.cos(car.angle);
+    const sn = Math.sin(car.angle);
+    const wx = car.x + ahead * c - config.headlightPoint.y * sn;
+    const gy = heightAt(wx) + 0.05;
+    const x = this.toScreenX(rc, wx);
+    const y = this.toScreenY(rc, gy);
+    const radius = Math.max(30, 3.6 * s);
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    g.addColorStop(0, `rgba(255,228,166,${0.2 * night})`);
+    g.addColorStop(0.45, `rgba(255,210,138,${0.08 * night})`);
+    g.addColorStop(1, "rgba(255,200,120,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(
+      x,
+      y,
+      radius * 1.55,
+      radius * 0.42,
+      Math.atan(slopeAt(wx)),
+      0,
+      TAU,
+    );
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Cone-shaped additive beam in vehicle space. */
+  private drawHeadlightCone(
+    ctx: CanvasRenderingContext2D,
+    config: VehicleConfig,
+    night: number,
+    time: number,
+  ): void {
+    const hx = config.headlightPoint.x;
+    const hy = config.headlightPoint.y;
+    const flicker = 0.94 + Math.sin(time * 11.3) * 0.03;
+    const length = 9.2 * flicker;
+    const half = 0.135;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const beam = ctx.createLinearGradient(hx, hy, hx + length, hy);
+    beam.addColorStop(0, `rgba(255,238,199,${0.28 * night})`);
+    beam.addColorStop(0.18, `rgba(255,224,166,${0.17 * night})`);
+    beam.addColorStop(0.62, `rgba(255,206,138,${0.07 * night})`);
+    beam.addColorStop(1, "rgba(255,196,120,0)");
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.quadraticCurveTo(
+      hx + length * 0.42,
+      hy - length * half * 0.55,
+      hx + length,
+      hy - length * half,
+    );
+    ctx.lineTo(hx + length, hy + length * half);
+    ctx.quadraticCurveTo(
+      hx + length * 0.42,
+      hy + length * half * 0.55,
+      hx,
+      hy,
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    const core = ctx.createLinearGradient(hx, hy, hx + length * 0.72, hy);
+    core.addColorStop(0, `rgba(255,248,226,${0.16 * night})`);
+    core.addColorStop(1, "rgba(255,232,180,0)");
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(hx + length * 0.72, hy - length * half * 0.38);
+    ctx.lineTo(hx + length * 0.72, hy + length * half * 0.38);
+    ctx.closePath();
+    ctx.fill();
+
+    const flare = ctx.createRadialGradient(hx, hy, 0, hx, hy, 0.55);
+    flare.addColorStop(0, `rgba(255,244,210,${0.5 * night})`);
+    flare.addColorStop(0.4, `rgba(255,220,160,${0.16 * night})`);
+    flare.addColorStop(1, "rgba(255,208,140,0)");
+    ctx.fillStyle = flare;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 0.55, 0, TAU);
+    ctx.fill();
     ctx.restore();
   }
 

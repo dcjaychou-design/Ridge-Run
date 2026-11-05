@@ -5,6 +5,9 @@ import {
   DUAL_PEDAL_DAMPING,
   GRAVITY,
   GROUND_DAMPING,
+  NITRO_CRUISE,
+  NITRO_MAX_SPEED,
+  NITRO_THRUST,
   SPRING,
   START_X,
 } from "../constants";
@@ -13,11 +16,13 @@ import type {
   CarState,
   DriveInput,
   PhysicsEvents,
+  PhysicsModifiers,
   VehicleConfig,
   VehicleStats,
   Vec2,
 } from "../types";
 import { clamp } from "../utils";
+import { surfaceAt, updraftAt } from "./biomes";
 import { heightAt, slopeAt } from "./terrain";
 
 const SPRING_FORCE_CAP = 62000;
@@ -140,7 +145,12 @@ export class VehiclePhysics {
     return this.car.y + point.x * s + point.y * c;
   }
 
-  solve(dt: number, input: DriveInput, stats: VehicleStats): PhysicsEvents {
+  solve(
+    dt: number,
+    input: DriveInput,
+    stats: VehicleStats,
+    modifiers: PhysicsModifiers,
+  ): PhysicsEvents {
     const car = this.car;
     const config = this.config;
     const wasGrounded = car.contactCount > 0;
@@ -181,6 +191,7 @@ export class VehiclePhysics {
       car.contact[i] = pen > 0;
 
       const share = config.wheelShares[i] ?? 1 / wheelCount;
+      const surface = surfaceAt(wx, stats.gripFactor);
 
       if (pen > 0) {
         car.contactCount++;
@@ -195,16 +206,26 @@ export class VehiclePhysics {
 
         let ft = 0;
         if (input.throttle) {
-          ft += config.engineBase * stats.engineFactor * share;
+          const boost = modifiers.nitro ? NITRO_THRUST : 1;
+          ft += config.engineBase * stats.engineFactor * share * boost;
+        } else if (modifiers.nitro && !input.brake) {
+          // Nitro keeps at least 60% cruise thrust even off the throttle.
+          ft += config.engineBase * stats.engineFactor * share * NITRO_CRUISE;
         }
         if (input.brake) {
           if (vt > 0.8) ft -= BRAKE * share;
           else if (vt > -0.6) ft -= config.engineBase * 0.54 * share;
         }
-        if (!input.throttle && !input.brake) {
-          ft -= Math.sign(vt) * Math.min(Math.abs(vt) * 16, 62);
+        if (surface.rollingResistance > 0 && Math.abs(vt) > 0.05) {
+          ft -= Math.sign(vt) * surface.rollingResistance * share;
         }
-        const traction = fn * 1.45 * stats.gripFactor;
+        if (!input.throttle && !input.brake) {
+          ft -=
+            Math.sign(vt) *
+            Math.min(Math.abs(vt) * 16, 62) *
+            surface.dragMultiplier;
+        }
+        const traction = fn * 1.45 * stats.gripFactor * surface.grip;
         ft = clamp(ft, -traction, traction);
         ax += (tx * ft) / config.mass;
         ay += (ty * ft) / config.mass;
@@ -268,12 +289,19 @@ export class VehiclePhysics {
       alpha -= car.omega * GROUND_DAMPING;
     }
 
+    // Night-summit updraft vents only bite while the wheels are off the ridge.
+    if (car.contactCount === 0) {
+      const lift = updraftAt(car.x);
+      if (lift > 0) ay -= 3.8 * lift;
+    }
+
     ax -= car.vx * Math.abs(car.vx) * 0.0024;
     ay -= car.vy * Math.abs(car.vy) * 0.0017;
     ax -= car.vx * 0.035;
 
-    car.vx = clamp(car.vx + ax * dt, -MAX_LINEAR_SPEED, MAX_LINEAR_SPEED);
-    car.vy = clamp(car.vy + ay * dt, -MAX_LINEAR_SPEED, MAX_LINEAR_SPEED);
+    const maxSpeed = modifiers.nitro ? NITRO_MAX_SPEED : MAX_LINEAR_SPEED;
+    car.vx = clamp(car.vx + ax * dt, -maxSpeed, maxSpeed);
+    car.vy = clamp(car.vy + ay * dt, -maxSpeed, maxSpeed);
     car.omega = clamp(
       car.omega + alpha * dt,
       -MAX_ANGULAR_SPEED,

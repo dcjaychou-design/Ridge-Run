@@ -48,3 +48,28 @@ export const roundRect = (
 
 export const formatCoins = (n: number): string =>
   Math.max(0, Math.floor(n)).toLocaleString("zh-CN");
+
+/** `#rrggbb` → `rgba(r,g,b,a)`. */
+export const withAlpha = (hex: string, alpha: number): string => {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
+/** Linear blend between two `#rrggbb` colours. */
+export const mixHex = (a: string, b: string, t: number): string => {
+  const ka = parseInt(a.slice(1), 16);
+  const kb = parseInt(b.slice(1), 16);
+  const ar = (ka >> 16) & 255;
+  const ag = (ka >> 8) & 255;
+  const ab = ka & 255;
+  const br = (kb >> 16) & 255;
+  const bg = (kb >> 8) & 255;
+  const bb = kb & 255;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
+};

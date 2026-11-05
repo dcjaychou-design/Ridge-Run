@@ -89,26 +89,55 @@ export class AudioController {
   }
 
   /** Continuous engine note; called every animation frame. */
-  updateEngine(active: boolean, gasHeld: boolean, speed: number): void {
+  updateEngine(
+    active: boolean,
+    gasHeld: boolean,
+    speed: number,
+    nitro = false,
+  ): void {
     if (!this.ac || !this.oscA || !this.oscB || !this.filter || !this.engineGain) {
       return;
     }
     const t = this.ac.currentTime;
     if (active) {
-      const base = 39 + Math.min(speed * 4.1, 108) + (gasHeld ? 18 : 0);
+      const boost = nitro ? 1.22 : 1;
+      const base =
+        (39 + Math.min(speed * 4.1, 108) + (gasHeld ? 18 : 0)) * boost;
       this.oscA.frequency.setTargetAtTime(base, t, 0.08);
       this.oscB.frequency.setTargetAtTime(base * 0.5, t, 0.08);
       this.filter.frequency.setTargetAtTime(
-        210 + speed * 32 + (gasHeld ? 170 : 0),
+        210 + speed * 32 + (gasHeld ? 170 : 0) + (nitro ? 260 : 0),
         t,
         0.08,
       );
       const target =
-        0.012 + (gasHeld ? 0.028 : 0.006) + Math.min(speed * 0.0007, 0.012);
+        0.012 +
+        (gasHeld ? 0.028 : 0.006) +
+        Math.min(speed * 0.0007, 0.012) +
+        (nitro ? 0.012 : 0);
       this.engineGain.gain.setTargetAtTime(target, t, 0.12);
     } else {
       this.engineGain.gain.setTargetAtTime(0.0001, t, 0.12);
     }
+  }
+
+  /** Stunt chord when a full 360° flip is banked. */
+  flip(): void {
+    this.chime(880, 0.12, "triangle", 0.034);
+    this.chime(1174, 0.14, "triangle", 0.03, 0, 0.055);
+    this.chime(1568, 0.2, "triangle", 0.028, 0, 0.11);
+  }
+
+  /** Turbo ignition: a fast sawtooth whoosh sliding upward. */
+  nitro(): void {
+    this.chime(240, 0.34, "sawtooth", 0.026, 1500);
+    this.chime(640, 0.28, "triangle", 0.02, 2400, 0.02);
+  }
+
+  /** Magnet activation: a two-step electromagnetic pulse. */
+  magnet(): void {
+    this.chime(196, 0.28, "sine", 0.032, 392);
+    this.chime(392, 0.22, "triangle", 0.026, 784, 0.1);
   }
 
   fuelPickup(): void {

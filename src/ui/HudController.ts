@@ -1,4 +1,8 @@
-import { JUMP_STAGES } from "../constants";
+import {
+  JUMP_STAGES,
+  MAGNET_DURATION,
+  MAX_NITRO_TIME,
+} from "../constants";
 import type { FrameFxState, GameState, HudSnapshot } from "../types";
 import { clamp, formatCoins } from "../utils";
 import { byId } from "./dom";
@@ -27,6 +31,16 @@ export class HudController {
   private readonly toastDetail = byId("toastDetail");
   private readonly introBest = byId("introBest");
   private readonly homeCoins = byId("homeCoinsValue");
+  private readonly stageChip = byId("stageChip");
+  private readonly buffBar = byId("buffBar");
+  private readonly nitroBuff = byId("nitroBuff");
+  private readonly nitroFill = byId("nitroFill");
+  private readonly nitroTime = byId("nitroTime");
+  private readonly magnetBuff = byId("magnetBuff");
+  private readonly magnetFill = byId("magnetFill");
+  private readonly magnetTime = byId("magnetTime");
+  private readonly comboChip = byId("comboChip");
+  private readonly comboValue = byId("comboValue");
 
   private toastTimer = 0;
   private last = {
@@ -37,6 +51,10 @@ export class HudController {
     speed: -1,
     delta: "",
     low: false,
+    stage: "",
+    nitro: -1,
+    magnet: -1,
+    combo: -1,
   };
 
   setMode(state: GameState): void {
@@ -97,6 +115,42 @@ export class HudController {
       "is-low-fuel",
       low && snapshot.playing && !snapshot.crashed,
     );
+
+    // biome stage capsule
+    const stageKey = `${snapshot.stageLabel}|${snapshot.stageName}|${snapshot.stageAccent}`;
+    if (force || stageKey !== this.last.stage) {
+      this.stageChip.textContent = `${snapshot.stageLabel} · ${snapshot.stageName}`;
+      this.stageChip.style.setProperty("--stage-accent", snapshot.stageAccent);
+      this.last.stage = stageKey;
+    }
+
+    // temporary power-up / combo chips
+    const live = snapshot.playing && !snapshot.crashed;
+    const nitro = live && snapshot.nitro > 0.03 ? snapshot.nitro : 0;
+    const magnet = live && snapshot.magnet > 0.03 ? snapshot.magnet : 0;
+    const combo = live ? Math.max(0, snapshot.combo) : 0;
+    const nitroKey = Math.round(nitro * 10) / 10;
+    const magnetKey = Math.round(magnet * 10) / 10;
+
+    this.nitroBuff.hidden = nitro <= 0;
+    this.magnetBuff.hidden = magnet <= 0;
+    this.comboChip.hidden = combo <= 0;
+    this.buffBar.hidden = nitro <= 0 && magnet <= 0 && combo <= 0;
+
+    this.nitroFill.style.transform = `scaleX(${clamp(nitro / MAX_NITRO_TIME, 0, 1)})`;
+    this.magnetFill.style.transform = `scaleX(${clamp(magnet / MAGNET_DURATION, 0, 1)})`;
+    if (force || nitroKey !== this.last.nitro) {
+      this.nitroTime.textContent = `${nitroKey.toFixed(1)}s`;
+      this.last.nitro = nitroKey;
+    }
+    if (force || magnetKey !== this.last.magnet) {
+      this.magnetTime.textContent = `${magnetKey.toFixed(1)}s`;
+      this.last.magnet = magnetKey;
+    }
+    if (force || combo !== this.last.combo) {
+      this.comboValue.textContent = String(combo);
+      this.last.combo = combo;
+    }
 
     const speed = Math.round(Math.abs(snapshot.speed) * 3.6);
     if (force || speed !== this.last.speed) {

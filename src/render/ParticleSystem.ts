@@ -1,5 +1,10 @@
-import type { CarState, Particle, RenderContext } from "../types";
-import { clamp, TAU } from "../utils";
+import type {
+  CarState,
+  Particle,
+  RenderContext,
+  VehicleConfig,
+} from "../types";
+import { clamp, TAU, withAlpha } from "../utils";
 
 const MAX_PARTICLES = 340;
 
@@ -29,22 +34,108 @@ export class ParticleSystem {
     });
   }
 
-  spawnExhaust(car: CarState): void {
+  /** World-space nozzle anchor and plume direction for the current rig. */
+  private nozzle(
+    car: CarState,
+    config: VehicleConfig,
+  ): { x: number; y: number; dx: number; dy: number } {
     const c = Math.cos(car.angle);
     const s = Math.sin(car.angle);
-    const lx = -1.48;
-    const ly = 0.24;
-    const x = car.x + lx * c - ly * s;
-    const y = car.y + lx * s + ly * c;
+    const lx = config.exhaustPoint.x;
+    const ly = config.exhaustPoint.y;
+    return {
+      x: car.x + lx * c - ly * s,
+      y: car.y + lx * s + ly * c,
+      dx: config.exhaustDir.x * c - config.exhaustDir.y * s,
+      dy: config.exhaustDir.x * s + config.exhaustDir.y * c,
+    };
+  }
+
+  spawnExhaust(car: CarState, config: VehicleConfig): void {
+    const n = this.nozzle(car, config);
     this.add({
       type: "smoke",
-      x,
-      y,
-      vx: -1.1 + Math.random() * 0.6 - car.vx * 0.1,
-      vy: -0.35 - Math.random() * 0.3,
+      x: n.x + (Math.random() - 0.5) * 0.08,
+      y: n.y + (Math.random() - 0.5) * 0.08,
+      vx: n.dx * (0.9 + Math.random() * 0.9) - car.vx * 0.08,
+      vy: n.dy * (0.9 + Math.random() * 0.9) - 0.2 - Math.random() * 0.2,
       life: 0.5 + Math.random() * 0.55,
       maxLife: 1.05,
       size: 0.07 + Math.random() * 0.13,
+    });
+  }
+
+  /** Cyan-white-to-amber nitro plume, sprayed at high frequency. */
+  spawnNitroFlame(
+    car: CarState,
+    config: VehicleConfig,
+    intensity: number,
+  ): void {
+    const n = this.nozzle(car, config);
+    const colors = ["#eafff7", "#a9f2e4", "#f6c66d"];
+    for (let i = 0; i < 2; i++) {
+      const spread = (Math.random() - 0.5) * 0.55;
+      const cs = Math.cos(spread);
+      const sn = Math.sin(spread);
+      const dx = n.dx * cs - n.dy * sn;
+      const dy = n.dx * sn + n.dy * cs;
+      const speed = 4.5 + Math.random() * 5;
+      this.add({
+        type: "flame",
+        x: n.x + (Math.random() - 0.5) * 0.1,
+        y: n.y + (Math.random() - 0.5) * 0.1,
+        vx: dx * speed + car.vx * 0.12,
+        vy: dy * speed + car.vy * 0.12,
+        life: 0.15 + Math.random() * 0.2,
+        maxLife: 0.35,
+        size: 0.075 + Math.random() * 0.08 + intensity * 0.04,
+        color: colors[Math.floor(Math.random() * colors.length)]!,
+      });
+    }
+  }
+
+  /** Golden friction sparks under the rear tyre during a wheelie. */
+  spawnWheelieSpark(x: number, y: number): void {
+    for (let i = 0; i < 4; i++) {
+      this.add({
+        type: "spark",
+        x: x + (Math.random() - 0.5) * 0.16,
+        y: y + 0.06,
+        vx: -1.4 - Math.random() * 2.4,
+        vy: -0.8 - Math.random() * 1.9,
+        life: 0.24 + Math.random() * 0.26,
+        maxLife: 0.5,
+        size: 0.04 + Math.random() * 0.05,
+        color: Math.random() < 0.4 ? "#fff0bd" : "#f0b15e",
+      });
+    }
+  }
+
+  spawnMud(x: number, y: number, dir: number, carVx: number): void {
+    this.add({
+      type: "dust",
+      x,
+      y,
+      vx: dir * (0.6 + Math.random() * 2.2) - carVx * 0.06,
+      vy: -0.5 - Math.random() * 1.3,
+      life: 0.4 + Math.random() * 0.55,
+      maxLife: 0.95,
+      size: 0.13 + Math.random() * 0.2,
+      color: Math.random() < 0.5 ? "#5d3a24" : "#3c2417",
+    });
+  }
+
+  spawnSnowSpray(x: number, y: number, dir: number, carVx: number): void {
+    this.add({
+      type: "dust",
+      x,
+      y,
+      vx: dir * (0.5 + Math.random() * 1.4) - carVx * 0.04,
+      vy: -0.8 - Math.random() * 1.6,
+      life: 0.28 + Math.random() * 0.32,
+      maxLife: 0.6,
+      size: 0.05 + Math.random() * 0.09,
+      color: "#e6f9fb",
     });
   }
 
@@ -179,9 +270,11 @@ export class ParticleSystem {
               ? -0.18
               : p.type === "coin"
                 ? 2.1
-                : 5.2;
+                : p.type === "flame"
+                  ? -0.4
+                  : 5.2;
         p.vy += gravity * dt;
-        p.vx *= Math.exp(-0.7 * dt);
+        p.vx *= Math.exp(-(p.type === "flame" ? 1.9 : 0.7) * dt);
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         if (p.type === "coin" && p.phase !== undefined) p.phase += dt * 12;
@@ -219,8 +312,27 @@ export class ParticleSystem {
         continue;
       }
 
+      if (p.type === "flame") {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = k * 0.9;
+        ctx.fillStyle = p.color ?? "#a9f2e4";
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = k * 0.6;
+        ctx.fillStyle = "#f4fff9";
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.42, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        continue;
+      }
+
       if (p.type === "dust") {
-        ctx.fillStyle = `rgba(220,169,106,${k * 0.23})`;
+        ctx.fillStyle = p.color
+          ? withAlpha(p.color, k * 0.4)
+          : `rgba(220,169,106,${k * 0.23})`;
       } else if (p.type === "smoke") {
         ctx.fillStyle = `rgba(223,216,194,${k * 0.12})`;
       } else if (p.type === "streak") {

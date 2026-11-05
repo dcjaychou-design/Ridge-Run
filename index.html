@@ -32,6 +32,7 @@
       <span class="micro">已行进</span>
       <div class="distance-line"><span class="distance-value" id="distanceValue">0</span><span class="distance-unit">m</span></div>
       <span class="best-line">最佳 <b id="bestHud">0</b> m</span>
+      <span class="stage-chip" id="stageChip"><b>STAGE 01 · 晨雾松林</b></span>
     </div>
 
     <div class="hud-right">
@@ -55,6 +56,19 @@
       <div class="fuel-panel" id="fuelPanel">
         <div class="fuel-head"><span>燃油</span><b id="fuelValue">100%</b></div>
         <div class="fuel-track" id="fuelTrack" role="progressbar" aria-label="燃油" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><div class="fuel-fill" id="fuelFill"></div></div>
+      </div>
+      <div class="buff-bar" id="buffBar" hidden>
+        <div class="buff buff--nitro" id="nitroBuff" hidden>
+          <span class="buff-label">NITRO</span>
+          <span class="buff-track"><i id="nitroFill"></i></span>
+          <span class="buff-time" id="nitroTime">0.0s</span>
+        </div>
+        <div class="buff buff--magnet" id="magnetBuff" hidden>
+          <span class="buff-label">MAGNET</span>
+          <span class="buff-track"><i id="magnetFill"></i></span>
+          <span class="buff-time" id="magnetTime">0.0s</span>
+        </div>
+        <span class="combo-chip" id="comboChip" hidden>COMBO <b>×<span id="comboValue">1</span></b></span>
       </div>
     </div>
   </header>

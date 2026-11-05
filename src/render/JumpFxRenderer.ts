@@ -59,6 +59,49 @@ export class JumpFxRenderer {
     ctx.restore();
   }
 
+  /** Amber gravity rings while the magnet power-up is live. */
+  drawMagnetAura(rc: RenderContext, car: CarState, jump: JumpState): void {
+    if (jump.magnetTime <= 0 || car.crashed) return;
+    const { ctx, view, time } = rc;
+    const sx = this.toScreenX(rc, car.x);
+    const sy = this.toScreenY(rc, car.y);
+    const s = view.scale;
+    const fade = Math.min(1, jump.magnetTime * 1.4);
+    const pulse = 0.82 + Math.sin(time * 5.2) * 0.18;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const glow = ctx.createRadialGradient(
+      sx,
+      sy,
+      s * 0.6,
+      sx,
+      sy,
+      s * 6.4 * pulse,
+    );
+    glow.addColorStop(0, "rgba(240,177,94,0)");
+    glow.addColorStop(0.72, `rgba(240,177,94,${0.05 * fade})`);
+    glow.addColorStop(1, "rgba(235,99,58,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, s * 6.4 * pulse, s * 4.1 * pulse, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.translate(sx, sy);
+    for (let i = 0; i < 3; i++) {
+      const radius = s * (2.5 + i * 0.95) * pulse;
+      ctx.strokeStyle = `rgba(240,177,94,${(0.28 - i * 0.06) * fade})`;
+      ctx.lineWidth = Math.max(1, s * 0.028);
+      ctx.setLineDash([radius * 0.22, radius * 0.3]);
+      ctx.lineDashOffset = time * (26 + i * 9) * (i % 2 ? -1 : 1);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 1.15, radius * 0.74, 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   drawFlash(rc: RenderContext, car: CarState, jump: JumpState): void {
     const strength = Math.max(jump.flash, jump.landing * 0.5);
     if (strength <= 0) return;
@@ -86,16 +129,21 @@ export class JumpFxRenderer {
     if (jump.calloutTime <= 0 || !jump.calloutTier) return;
     const { ctx, view, time } = rc;
     const stage = JUMP_STAGES[jump.calloutTier - 1]!;
+    const color = jump.flashColor;
     const duration = jump.calloutReward ? 1.2 : 1.05;
     const progress = 1 - jump.calloutTime / duration;
     const alpha = Math.min(1, jump.calloutTime * 3);
     const x = this.toScreenX(rc, car.x);
     const y =
       this.toScreenY(rc, car.y) - 54 - progress * 24 + Math.sin(time * 9) * 2;
-    const title = stage.title + (jump.calloutTier === 3 ? "!!" : "!");
-    const subtitle = jump.calloutReward
-      ? `+${jump.calloutReward} 金币`
-      : `${jump.duration.toFixed(2)}s IN AIR`;
+    const title =
+      jump.stuntTitle ||
+      stage.title + (jump.calloutTier === 3 ? "!!" : "!");
+    const subtitle =
+      jump.stuntSubtitle ||
+      (jump.calloutReward
+        ? `+${jump.calloutReward} 金币`
+        : `${jump.duration.toFixed(2)}s IN AIR`);
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -105,10 +153,10 @@ export class JumpFxRenderer {
     ctx.lineJoin = "round";
     ctx.lineWidth = Math.max(4, view.scale * 0.14);
     ctx.strokeStyle = "rgba(7,21,17,.92)";
-    ctx.shadowColor = stage.color;
+    ctx.shadowColor = color;
     ctx.shadowBlur = 14 + jump.calloutTier * 7;
     ctx.strokeText(title, x, y);
-    ctx.fillStyle = stage.color;
+    ctx.fillStyle = color;
     ctx.fillText(title, x, y);
     ctx.shadowBlur = 0;
     ctx.font = `500 ${Math.max(10, Math.min(15, view.scale * 0.44))}px "IBM Plex Mono",monospace`;

@@ -1,24 +1,57 @@
 import type { RenderContext } from "../types";
-import { clamp, hash } from "../utils";
+import { clamp, hash, withAlpha } from "../utils";
 
 interface RidgePoint {
   x: number;
   y: number;
 }
 
-/** Three parallax ridge layers with sunlit crests and ridgeline pines. */
+/** Three parallax ridge layers tinted by the current biome palette. */
 export class MountainRenderer {
   draw(rc: RenderContext, cameraX: number): void {
-    const { width: W, height: H } = rc;
-    this.layer(rc, cameraX, H * 0.7, H * 0.27, "#b2a58e", "#7a887e", 0.014, 0.45, false, false);
-    this.layer(rc, cameraX, H * 0.77, H * 0.25, "#6b8077", "#3e594f", 0.038, 2.25, true, true);
-    this.layer(rc, cameraX, H * 0.88, H * 0.22, "#2b4a3f", "#0c2620", 0.083, 3.9, true, true);
+    const { width: W, height: H, palette: p } = rc;
+    this.layer(
+      rc,
+      cameraX,
+      H * 0.7,
+      H * 0.27,
+      p.farTop,
+      p.farBottom,
+      0.014,
+      0.45,
+      false,
+      false,
+    );
+    this.layer(
+      rc,
+      cameraX,
+      H * 0.77,
+      H * 0.25,
+      p.midTop,
+      p.midBottom,
+      0.038,
+      2.25,
+      true,
+      true,
+    );
+    this.layer(
+      rc,
+      cameraX,
+      H * 0.88,
+      H * 0.22,
+      p.nearTop,
+      p.nearBottom,
+      0.083,
+      3.9,
+      true,
+      true,
+    );
 
     const { ctx } = rc;
     const haze = ctx.createLinearGradient(0, H * 0.46, 0, H * 0.82);
-    haze.addColorStop(0, "rgba(240,177,94,0)");
-    haze.addColorStop(0.52, "rgba(240,177,94,.13)");
-    haze.addColorStop(1, "rgba(9,25,21,.26)");
+    haze.addColorStop(0, withAlpha(p.hazeColor, 0));
+    haze.addColorStop(0.52, withAlpha(p.hazeColor, p.hazeAlpha));
+    haze.addColorStop(1, withAlpha(p.groundBottom, 0.26));
     ctx.fillStyle = haze;
     ctx.fillRect(0, H * 0.46, W, H * 0.36);
   }
@@ -47,7 +80,7 @@ export class MountainRenderer {
     detail: boolean,
     trees: boolean,
   ): void {
-    const { ctx, width: W, height: H, view } = rc;
+    const { ctx, width: W, height: H, view, palette: p } = rc;
     const offset = cameraX * view.scale * parallax;
     const pts: RidgePoint[] = [];
     for (let x = -40; x <= W + 50; x += 7) {
@@ -68,24 +101,33 @@ export class MountainRenderer {
     ctx.fillStyle = g;
     ctx.fill();
 
-    // A sunlit crest and tiny ridgeline pines give depth without competing
-    // with the playable slope.
+    // A lit crest and snow caps give depth without competing with the slope.
     ctx.save();
-    ctx.globalAlpha = 0.2;
-    ctx.strokeStyle = "#f4d7a2";
+    ctx.globalAlpha = p.crestAlpha;
+    ctx.strokeStyle = p.crestColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i < pts.length; i++) {
-      const p = pts[i]!;
-      if (i === 0) ctx.moveTo(p.x, p.y + 1.2);
-      else ctx.lineTo(p.x, p.y + 1.2);
+      const point = pts[i]!;
+      if (i === 0) ctx.moveTo(point.x, point.y + 1.2);
+      else ctx.lineTo(point.x, point.y + 1.2);
     }
     ctx.stroke();
+    if (p.snowCap > 0.01) {
+      ctx.globalAlpha = p.snowCap * 0.55;
+      ctx.strokeStyle = "#f7feff";
+      ctx.lineWidth = 3.4;
+      ctx.stroke();
+      ctx.globalAlpha = p.snowCap;
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    }
     ctx.restore();
 
-    if (!trees) return;
+    if (!trees || p.treeAlpha < 0.02) return;
 
     ctx.save();
+    ctx.fillStyle = withAlpha(p.treeColor, p.treeAlpha);
     for (let x = -30; x < W + 30; x += 16) {
       const q = hash(x * 0.071 + phase * 83.1);
       if (q < 0.53) continue;
@@ -94,7 +136,6 @@ export class MountainRenderer {
       const y = baseY - amp * ridge + 1;
       const h = 4 + q * 9;
       const w = h * 0.36;
-      ctx.fillStyle = "rgba(8,25,20,.38)";
       ctx.beginPath();
       ctx.moveTo(x - w, y + 1);
       ctx.lineTo(x, y - h);

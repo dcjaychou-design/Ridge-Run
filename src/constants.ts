@@ -37,6 +37,36 @@ export const JUMP_STAGES = [
   { time: 1.5, reward: 6, title: "超级飞跃", color: "#fff0bd" },
 ] as const;
 
+/* ---------- stunts / nitro / power-ups ---------- */
+export const MAX_NITRO_TIME = 3.5;
+export const NITRO_PICKUP_TIME = 2.2;
+export const NITRO_PERFECT_TIME = 1.6;
+export const NITRO_FLIP_TIME = 0.8;
+export const NITRO_THRUST = 1.55;
+export const NITRO_CRUISE = 0.6;
+export const NITRO_MAX_SPEED = 52;
+export const FLIP_TOLERANCE = 0.42;
+export const FLIP_REWARD = 12;
+export const PERFECT_MIN_AIR = 0.45;
+export const PERFECT_ANGLE = 0.16;
+export const PERFECT_MAX_COMBO = 5;
+export const WHEELIE_MIN_SPEED = 2.5;
+export const WHEELIE_ANGLE = 0.18;
+export const WHEELIE_START = 1.5;
+export const WHEELIE_INTERVAL = 1;
+export const WHEELIE_REWARD = 2;
+export const MAGNET_DURATION = 10;
+export const MAGNET_MAX_TIME = 12;
+export const MAGNET_RADIUS = 6.8;
+
+/* ---------- biomes ---------- */
+export const STAGE_LENGTH = 500;
+export const BIOME_PERIOD = 2000;
+export const BIOME_TRANSITION = 45;
+export const ICE_GRIP = 0.52;
+export const MUD_GRIP = 0.78;
+export const TIRE_PENALTY_OFFSET = 0.45;
+
 /* ---------- vehicles ---------- */
 export const VEHICLES: Record<VehicleId, VehicleConfig> = {
   rally: {
@@ -70,6 +100,9 @@ export const VEHICLES: Record<VehicleId, VehicleConfig> = {
     ],
     displayLength: 3.7,
     displayHeight: 2.05,
+    exhaustPoint: { x: -1.48, y: 0.24 },
+    exhaustDir: { x: -0.985, y: -0.174 },
+    headlightPoint: { x: 1.45, y: -0.09 },
   },
   moto: {
     id: "moto",
@@ -102,6 +135,9 @@ export const VEHICLES: Record<VehicleId, VehicleConfig> = {
     ],
     displayLength: 2.85,
     displayHeight: 2.15,
+    exhaustPoint: { x: -0.82, y: 0.08 },
+    exhaustDir: { x: -0.985, y: -0.174 },
+    headlightPoint: { x: 0.78, y: -0.34 },
   },
   truck: {
     id: "truck",
@@ -134,6 +170,9 @@ export const VEHICLES: Record<VehicleId, VehicleConfig> = {
     ],
     displayLength: 5.1,
     displayHeight: 2.45,
+    exhaustPoint: { x: 0.2, y: -1.29 },
+    exhaustDir: { x: -0.34, y: -0.94 },
+    headlightPoint: { x: 1.62, y: -0.05 },
   },
 };
 
