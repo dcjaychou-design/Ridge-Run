@@ -1,6 +1,19 @@
+import {
+  GHOST_ALPHA,
+  GHOST_FINISHED_ALPHA,
+  START_X,
+} from "../constants";
+import { ghostProgress } from "../ghost/GhostSystem";
+import type { GhostPose } from "../ghost/GhostSystem";
 import { heightAt, slopeAt } from "../physics/terrain";
-import type { CarState, RenderContext, VehicleConfig } from "../types";
-import { roundRect, TAU } from "../utils";
+import type {
+  CarState,
+  GhostKind,
+  GhostRecord,
+  RenderContext,
+  VehicleConfig,
+} from "../types";
+import { clamp, roundRect, TAU, withAlpha } from "../utils";
 
 /**
  * Draws the selected machine in the world and the turntable preview in the
@@ -200,6 +213,269 @@ export class VehicleRenderer {
       ctx,
       config,
       config.wheelPositions.map(() => spin),
+      time,
+    );
+    ctx.restore();
+  }
+
+  /**
+   * Holographic replay car with a tactical nameplate. Returns the ghost's
+   * screen X so the radar indicator can take over once it leaves the view.
+   */
+  drawGhost(
+    rc: RenderContext,
+    config: VehicleConfig,
+    pose: GhostPose,
+    record: GhostRecord,
+    kind: GhostKind,
+    playerDistance: number,
+  ): number {
+    const { ctx, width: W, height: H, view, time } = rc;
+    const sx = this.toScreenX(rc, pose.x);
+    const sy = this.toScreenY(rc, pose.y);
+    const s = view.scale;
+    const color = kind === "pb" ? "#89d8c8" : "#f0b15e";
+    const alpha = pose.finished
+      ? GHOST_FINISHED_ALPHA * (0.86 + Math.sin(time * 2.3) * 0.14)
+      : GHOST_ALPHA;
+
+    if (sx < -240 || sx > W + 240 || sy < -240 || sy > H + 240) return sx;
+
+    const groundY = this.toScreenY(rc, heightAt(pose.x) + 0.04);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const glow = ctx.createRadialGradient(
+      sx,
+      groundY,
+      0,
+      sx,
+      groundY,
+      s * config.displayLength * 0.72,
+    );
+    glow.addColorStop(0, withAlpha(color, 0.18));
+    glow.addColorStop(0.55, withAlpha(color, 0.05));
+    glow.addColorStop(1, withAlpha(color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(
+      sx,
+      groundY,
+      s * config.displayLength * 0.7,
+      s * 0.4,
+      Math.atan(slopeAt(pose.x)),
+      0,
+      TAU,
+    );
+    ctx.fill();
+    ctx.restore();
+
+    const spin = (pose.x - START_X) / Math.max(0.18, config.wheelRadius);
+    const spins = config.wheelPositions.map(() => spin);
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(pose.angle);
+    ctx.scale(s, s);
+    ctx.globalAlpha = alpha;
+    this.drawMachine(ctx, config, spins, time);
+    ctx.restore();
+
+    // Hologram wires + scanlines, drawn over the translucent body.
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(pose.angle);
+    ctx.scale(s, s);
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = withAlpha(color, 0.72);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 0.026;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    const roof = config.roofPoints;
+    ctx.moveTo(roof[0]!.x, roof[0]!.y);
+    for (let i = 1; i < roof.length; i++) ctx.lineTo(roof[i]!.x, roof[i]!.y);
+    ctx.stroke();
+    ctx.beginPath();
+    const chassis = config.chassisPoints;
+    ctx.moveTo(chassis[0]!.x, chassis[0]!.y);
+    for (let i = 1; i < chassis.length; i++) {
+      ctx.lineTo(chassis[i]!.x, chassis[i]!.y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const frameX = -config.displayLength * 0.56;
+    const frameY = -config.displayHeight * 0.86;
+    const frameW = config.displayLength * 1.12;
+    const frameH = config.displayHeight * 0.98;
+    ctx.save();
+    roundRect(ctx, frameX, frameY, frameW, frameH, 0.14);
+    ctx.clip();
+    const gap = 0.13;
+    const shift = (time * 1.35) % 1;
+    ctx.strokeStyle = withAlpha(color, 0.24);
+    ctx.lineWidth = 0.012;
+    for (let y = frameY - gap + shift * gap; y < frameY + frameH; y += gap) {
+      ctx.beginPath();
+      ctx.moveTo(frameX, y);
+      ctx.lineTo(frameX + frameW, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Four corner brackets keep the scan box reading as instrumentation.
+    const corner = Math.min(0.34, frameW * 0.16);
+    ctx.strokeStyle = withAlpha(color, 0.2);
+    ctx.lineWidth = 0.016;
+    const corners = [
+      [frameX, frameY, 1, 1],
+      [frameX + frameW, frameY, -1, 1],
+      [frameX, frameY + frameH, 1, -1],
+      [frameX + frameW, frameY + frameH, -1, -1],
+    ] as const;
+    for (const [cx, cy, dx, dy] of corners) {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * corner, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy + dy * corner);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (sx < 0 || sx > W) return sx;
+
+    const progress = ghostProgress(record, pose);
+    const delta = Math.round(playerDistance - progress);
+    const label = kind === "pb" ? "PB" : "RIVAL";
+    const mainText = `${label} · ${record.distance}m`;
+    const deltaText = `${delta >= 0 ? "+" : ""}${delta}m`;
+    const mainFont = `${Math.max(9, Math.min(13, s * 0.36))}px "IBM Plex Mono", monospace`;
+    const deltaFont = `${Math.max(9, Math.min(13, s * 0.36))}px "IBM Plex Mono", monospace`;
+    ctx.save();
+    ctx.font = mainFont;
+    const mainWidth = ctx.measureText(mainText).width;
+    ctx.font = deltaFont;
+    const deltaWidth = ctx.measureText(deltaText).width;
+    const pad = 8;
+    const gapWidth = 7;
+    const boxHeight = 21;
+    const boxWidth = mainWidth + deltaWidth + gapWidth + pad * 2 + 3;
+    const boxX = clamp(sx - boxWidth * 0.5, 8, W - boxWidth - 8);
+    const boxY = Math.max(
+      8,
+      sy - s * config.displayHeight * 0.95 - 34,
+    );
+    roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 3);
+    ctx.fillStyle = "rgba(5,15,12,.8)";
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(color, 0.5);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.fillRect(boxX, boxY, 2, boxHeight);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = mainFont;
+    ctx.fillStyle = color;
+    ctx.fillText(mainText, boxX + pad + 2, boxY + boxHeight * 0.5 + 0.5);
+    ctx.font = deltaFont;
+    ctx.fillStyle = delta >= 0 ? "#f4e8d2" : "#eb633a";
+    ctx.fillText(
+      deltaText,
+      boxX + pad + mainWidth + gapWidth + 2,
+      boxY + boxHeight * 0.5 + 0.5,
+    );
+    ctx.restore();
+
+    return sx;
+  }
+
+  /** Glowing ghost finish pennant planted at the replay's final distance. */
+  drawGhostMarker(
+    rc: RenderContext,
+    worldX: number,
+    kind: GhostKind,
+    distance: number,
+  ): void {
+    const { ctx, width: W, view, time } = rc;
+    const sx = this.toScreenX(rc, worldX);
+    if (sx < -140 || sx > W + 140) return;
+    const s = view.scale;
+    const baseY = this.toScreenY(rc, heightAt(worldX));
+    const height = 2.45 * s;
+    const color = kind === "pb" ? "#89d8c8" : "#f0b15e";
+    const label = kind === "pb" ? "PB" : "RIVAL";
+    const pulse = 0.72 + Math.sin(time * 2.4) * 0.2;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const groundGlow = ctx.createRadialGradient(
+      sx,
+      baseY,
+      0,
+      sx,
+      baseY,
+      s * 2.2,
+    );
+    groundGlow.addColorStop(0, withAlpha(color, 0.18 * pulse));
+    groundGlow.addColorStop(1, withAlpha(color, 0));
+    ctx.fillStyle = groundGlow;
+    ctx.beginPath();
+    ctx.ellipse(sx, baseY, s * 2.2, s * 0.5, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.strokeStyle = withAlpha(color, 0.5 * pulse);
+    ctx.lineWidth = Math.max(1, s * 0.045);
+    ctx.beginPath();
+    ctx.moveTo(sx, baseY);
+    ctx.lineTo(sx, baseY - height);
+    ctx.stroke();
+
+    ctx.fillStyle = withAlpha(color, 0.26 * pulse);
+    ctx.beginPath();
+    ctx.moveTo(sx, baseY - height);
+    ctx.lineTo(sx + s * 2.15, baseY - height + s * 0.5);
+    ctx.lineTo(sx, baseY - height + s * 1.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(color, 0.46 * pulse);
+    ctx.lineWidth = Math.max(1, s * 0.018);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = `600 ${Math.max(9, Math.min(13, s * 0.36))}px "IBM Plex Mono", monospace`;
+    ctx.fillStyle = withAlpha(color, 0.88);
+    ctx.fillText(
+      `${label} ${distance}m`,
+      sx + s * 0.5,
+      baseY - height - Math.max(8, s * 0.3),
+    );
+    ctx.restore();
+  }
+
+  /** Full-bleed hero pose used by the tactical poster. */
+  drawHero(
+    ctx: CanvasRenderingContext2D,
+    config: VehicleConfig,
+    x: number,
+    y: number,
+    scale: number,
+    angle: number,
+    wheelSpin: number,
+    time: number,
+  ): void {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.scale(scale, scale);
+    this.drawMachine(
+      ctx,
+      config,
+      config.wheelPositions.map(() => wheelSpin),
       time,
     );
     ctx.restore();

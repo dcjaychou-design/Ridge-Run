@@ -189,6 +189,34 @@ export class AudioController {
     this.chime(180, 0.14, "square", 0.03, 120);
   }
 
+  /** Ghost finish line crossed: a bright two-step ridge-call. */
+  overtake(): void {
+    this.chime(1046, 0.12, "triangle", 0.042);
+    this.chime(1568, 0.18, "triangle", 0.038, 0, 0.07);
+    this.chime(2093, 0.26, "triangle", 0.03, 0, 0.15);
+  }
+
+  /** Pit contract banked. */
+  mission(): void {
+    this.chime(740, 0.12, "triangle", 0.034);
+    this.chime(988, 0.16, "triangle", 0.032, 0, 0.08);
+    this.chime(1318, 0.24, "triangle", 0.028, 0, 0.16);
+  }
+
+  /** Rival challenge won: a short alpine fanfare. */
+  challengeWin(): void {
+    this.chime(523, 0.14, "square", 0.026);
+    this.chime(659, 0.16, "triangle", 0.034, 0, 0.1);
+    this.chime(784, 0.18, "triangle", 0.034, 0, 0.2);
+    this.chime(1046, 0.36, "triangle", 0.038, 0, 0.3);
+  }
+
+  /** Daily trial opened: a single bright seed-note. */
+  dailyStart(): void {
+    this.chime(880, 0.12, "triangle", 0.028);
+    this.chime(1174, 0.2, "sine", 0.026, 0, 0.09);
+  }
+
   private chime(
     freq: number,
     duration: number,

@@ -17,6 +17,46 @@ export interface UpgradeLevels {
   fuel: number;
 }
 
+export type RunMode = "standard" | "daily" | "challenge";
+
+export type GhostMode = "standard" | "daily";
+
+export type GhostKind = "pb" | "rival";
+
+/**
+ * A compressed run replay. `frames` stores `[x, y, angle]` triplets: the
+ * first is absolute in quantised units (0.1 m / 0.01 rad), every later frame
+ * stores the delta from the previous one. `stride` is how many 0.15 s sample
+ * ticks each stored frame spans (1 for locally recorded runs).
+ */
+export interface GhostRecord {
+  version: 1;
+  mode: GhostMode;
+  seed: number;
+  dateKey?: string;
+  vehicleId: VehicleId;
+  distance: number;
+  frames: number[];
+  stride?: number;
+}
+
+export type MissionKind =
+  | "distance"
+  | "flips"
+  | "perfect"
+  | "coins"
+  | "wheelie"
+  | "stage";
+
+export interface MissionState {
+  id: string;
+  kind: MissionKind;
+  target: number;
+  reward: number;
+  progress: number;
+  done: boolean;
+}
+
 export interface GameSave {
   best: number;
   coins: number;
@@ -24,6 +64,13 @@ export interface GameSave {
   selectedVehicle: VehicleId;
   unlockedVehicles: VehicleId[];
   upgrades: Record<VehicleId, UpgradeLevels>;
+  bestGhost: GhostRecord | null;
+  dailyDate: string;
+  dailyBest: number;
+  dailyFirstClaimed: boolean;
+  dailyGhost: GhostRecord | null;
+  missions: MissionState[];
+  completedMissions: number;
 }
 
 export interface VehicleConfig {
@@ -327,6 +374,13 @@ export interface RunResult {
   best: number;
   record: boolean;
   reason: RunEndReason;
+  mode: RunMode;
+  challengeWin: boolean;
+  rivalDistance: number;
+  dailyRecord: boolean;
+  highlightStunt: string;
+  ghostOutcome: string;
+  bounty: number;
 }
 
 export type GameState = "intro" | "playing" | "paused" | "over";

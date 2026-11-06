@@ -32,6 +32,7 @@ export class HudController {
   private readonly introBest = byId("introBest");
   private readonly homeCoins = byId("homeCoinsValue");
   private readonly stageChip = byId("stageChip");
+  private readonly modeChip = byId("modeChip");
   private readonly buffBar = byId("buffBar");
   private readonly nitroBuff = byId("nitroBuff");
   private readonly nitroFill = byId("nitroFill");
@@ -158,6 +159,15 @@ export class HudController {
       this.speedFill.style.width = `${clamp(speed / 110, 0, 1) * 100}%`;
       this.last.speed = speed;
     }
+  }
+
+  setModeChip(
+    label: string,
+    tone: "standard" | "daily" | "challenge" = "standard",
+  ): void {
+    this.modeChip.textContent = label;
+    this.modeChip.hidden = !label;
+    this.modeChip.dataset.tone = tone;
   }
 
   updateMeta(best: number, coins: number): void {

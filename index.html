@@ -33,6 +33,7 @@
       <div class="distance-line"><span class="distance-value" id="distanceValue">0</span><span class="distance-unit">m</span></div>
       <span class="best-line">最佳 <b id="bestHud">0</b> m</span>
       <span class="stage-chip" id="stageChip"><b>STAGE 01 · 晨雾松林</b></span>
+      <span class="mode-chip" id="modeChip" hidden></span>
     </div>
 
     <div class="hud-right">
@@ -105,6 +106,22 @@
         <p class="eyebrow">Ridge Run · Stage ∞</p>
         <h1 class="wordmark" id="gameTitle">山脊<span class="outline">冲刺</span><span class="wordmark-sun" aria-hidden="true"></span></h1>
         <p class="lede">把油门踩进晨雾里。越过山脊、稳住车身，<br>在燃油见底之前，抵达更远的山峰。</p>
+
+        <div class="challenge-banner" id="challengeBanner" hidden>
+          <span class="challenge-banner-mark" aria-hidden="true"></span>
+          <div class="challenge-banner-copy">
+            <span class="challenge-banner-kicker">已加载山脊战书 · RIVAL LINK</span>
+            <strong id="challengeBannerTarget">目标 0m</strong>
+            <small id="challengeBannerMeta">RIVAL · SEED 00000000</small>
+          </div>
+          <div class="challenge-banner-actions">
+            <button class="btn-primary btn-compact" id="challengeStartBtn" type="button">应战发车</button>
+            <button class="icon-btn" id="challengeClearBtn" type="button" aria-label="移除已加载的战书">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+        </div>
+
         <div class="cta-row">
           <button class="btn-primary" id="startBtn" type="button">点火出发
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M9 6h9v9"/></svg>
@@ -116,6 +133,26 @@
           <span class="home-balance" title="累计金币"><span class="coin-mark" aria-hidden="true"></span><b id="homeCoinsValue">0</b><small>金币</small></span>
           <span class="press-hint">按 ENTER 开始</span>
         </div>
+
+        <div class="mode-row">
+          <button class="mode-card" id="dailyBtn" type="button">
+            <span class="mode-card-kicker">DAILY SEED</span>
+            <span class="mode-card-body">
+              <strong>每日试炼</strong>
+              <small id="dailyBtnMeta">今日试炼 · #07 阿尔卑斯拉力车</small>
+            </span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M9 6h9v9"/></svg>
+          </button>
+          <button class="mode-card" id="challengeBtn" type="button">
+            <span class="mode-card-kicker">RIVAL LINK</span>
+            <span class="mode-card-body">
+              <strong>战书挑战</strong>
+              <small id="challengeBtnMeta">粘贴挑战码 / 打开好友战书</small>
+            </span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M9 6h9v9"/></svg>
+          </button>
+        </div>
+
         <p class="mobile-note">右侧油门 · 左侧刹车 · 腾空时用两只踏板控姿</p>
       </div>
 
@@ -126,6 +163,12 @@
         <div class="drive-row"><span class="keys"><kbd>P</kbd><kbd>M</kbd></span><span>暂停 / 静音</span></div>
         <div class="drive-row"><span class="keys"><kbd>G</kbd></span><span>整备车库</span></div>
         <p class="drive-note">触屏使用两侧踏板。腾空时，油门抬车头，刹车压车头；收集油桶，别让油表先归零。三款车型与十级改装都在车库里。</p>
+
+        <div class="mission-board">
+          <div class="mission-board-head"><span>悬赏看板</span><span>PIT CONTRACTS</span></div>
+          <div class="mission-list" id="missionBoardList"></div>
+          <p class="mission-board-note">单局达成 · 即时结算 · 赛后轮换</p>
+        </div>
       </aside>
     </div>
 
@@ -144,6 +187,10 @@
         <div class="stat"><span>当前距离</span><strong id="pauseDistance">0<small>m</small></strong></div>
         <div class="stat"><span>本程获得</span><strong id="pauseCoins">0</strong></div>
         <div class="stat"><span>燃油</span><strong id="pauseFuel">100<small>%</small></strong></div>
+      </div>
+      <div class="modal-section">
+        <div class="mission-board-head"><span>进行中的悬赏</span><span>PIT CONTRACTS</span></div>
+        <div class="mission-list mission-list--compact" id="pauseMissionList"></div>
       </div>
       <div class="modal-actions">
         <button class="btn-primary" id="resumeBtn" type="button">继续爬坡
@@ -165,15 +212,69 @@
       <div class="stats">
         <div class="stat"><span>本次距离</span><strong id="resultDistance">0<small>m</small></strong></div>
         <div class="stat"><span>本程获得</span><strong id="resultCoins">0</strong></div>
-        <div class="stat"><span>个人最佳</span><strong id="resultBest">0<small>m</small></strong></div>
+        <div class="stat"><span id="resultBestLabel">个人最佳</span><strong id="resultBest">0<small>m</small></strong></div>
       </div>
+
+      <div class="result-highlights">
+        <div class="result-highlight"><span>最高特技</span><b id="resultStunt">—</b></div>
+        <div class="result-highlight"><span>幽灵对决</span><b id="resultGhost">—</b></div>
+        <div class="result-highlight"><span>悬赏收益</span><b id="resultBounty">+0</b></div>
+      </div>
+
+      <div class="modal-section">
+        <div class="mission-board-head"><span>下一程悬赏</span><span>PIT CONTRACTS</span></div>
+        <div class="mission-list mission-list--compact" id="resultMissionList"></div>
+      </div>
+
       <div class="modal-actions">
         <button class="btn-primary" id="againBtn" type="button">再跑一程
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M9 6h9v9"/></svg>
         </button>
+        <button class="btn-ghost" id="copyChallengeBtn" type="button">复制战书链接</button>
+        <button class="btn-ghost" id="posterBtn" type="button">生成战术战报</button>
         <button class="btn-ghost" id="resultUpgradeBtn" type="button">升级车辆 <kbd>G</kbd></button>
         <button class="btn-ghost" id="homeBtn" type="button">回到起点</button>
       </div>
+    </div>
+  </section>
+
+  <section class="screen is-hidden" id="challengeOverlay" role="dialog" aria-modal="true" aria-labelledby="challengeTitle" aria-hidden="true" inert>
+    <div class="modal challenge-modal">
+      <p class="eyebrow">Rival challenge</p>
+      <h2 id="challengeTitle">山脊战书</h2>
+      <p class="modal-copy">粘贴好友发来的挑战码，或直接打开带 <code>#challenge=</code> 的战书链接。载入后会在完全相同的种子地形上同屏竞速。</p>
+      <label class="field-label" for="challengeInput">挑战码 / 战书链接</label>
+      <textarea id="challengeInput" rows="3" spellcheck="false" placeholder="RR2.…"></textarea>
+      <p class="challenge-status" id="challengeStatus" role="status"></p>
+      <div class="modal-actions">
+        <button class="btn-primary" id="challengeLoadBtn" type="button">载入战书
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <button class="btn-ghost" id="challengeCloseBtn" type="button">取消</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen screen--poster is-hidden" id="posterOverlay" role="dialog" aria-modal="true" aria-labelledby="posterTitle" aria-hidden="true" inert>
+    <div class="poster-panel">
+      <header class="poster-head">
+        <div>
+          <p class="eyebrow">Tactical run poster</p>
+          <h2 id="posterTitle">战术战报</h2>
+        </div>
+        <button class="icon-btn" id="posterCloseBtn" type="button" aria-label="关闭战报">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="poster-frame">
+        <canvas id="posterCanvas" width="1200" height="630" aria-label="本局战术战报"></canvas>
+      </div>
+      <footer class="poster-actions">
+        <button class="btn-primary" id="posterDownloadBtn" type="button">下载 PNG 战报
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
+        </button>
+        <button class="btn-ghost" id="posterCopyBtn" type="button">复制挑战链接</button>
+      </footer>
     </div>
   </section>
 

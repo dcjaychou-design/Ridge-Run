@@ -1,10 +1,13 @@
 import { AudioController } from "./audio/AudioController";
 import {
+  CHALLENGE_WIN_BOUNTY,
   CHUNK,
   CRASH_SETTLE_TIME,
   FLIP_REWARD,
   FLIP_TOLERANCE,
   FUEL_PICKUP_AMOUNT,
+  GHOST_MIN_OVERTAKE,
+  GHOST_RADAR_RANGE,
   GOAL_STEP,
   JUMP_STAGES,
   LOW_FUEL_RATIO,
@@ -19,6 +22,7 @@ import {
   PERFECT_MAX_COMBO,
   PERFECT_MIN_AIR,
   RESPAWN_FUEL_COST,
+  STAGE_LENGTH,
   START_X,
   VEHICLES,
   WHEELIE_ANGLE,
@@ -29,12 +33,36 @@ import {
   deriveVehicleStats,
 } from "./constants";
 import {
+  dailySeedFor,
+  dailyVehicleFor,
+  fairUpgrades,
+  refreshDaily,
+  seedHex,
+  settleDaily,
+  utcDateKey,
+} from "./daily";
+import {
+  GhostPlayback,
+  GhostRecorder,
+  challengeFromHash,
+  decodeChallengeCode,
+  encodeGhostCode,
+  ghostProgress,
+} from "./ghost/GhostSystem";
+import type { GhostPose } from "./ghost/GhostSystem";
+import { MissionTracker, missionTitle } from "./missions";
+import {
   biomePaletteAt,
   stageInfoAt,
   surfaceAt,
 } from "./physics/biomes";
 import { VehiclePhysics } from "./physics/VehiclePhysics";
-import { heightAt, slopeAt } from "./physics/terrain";
+import {
+  getWorldSeed,
+  heightAt,
+  setWorldSeed,
+  slopeAt,
+} from "./physics/terrain";
 import { AtmosphereRenderer } from "./render/AtmosphereRenderer";
 import { ItemRenderer } from "./render/ItemRenderer";
 import { JumpFxRenderer } from "./render/JumpFxRenderer";
@@ -49,6 +77,8 @@ import type {
   CarState,
   FrameFxState,
   GameState,
+  GhostKind,
+  GhostRecord,
   HudSnapshot,
   ImpactMode,
   Item,
@@ -56,12 +86,18 @@ import type {
   JumpTier,
   RenderContext,
   RunEndReason,
+  RunMode,
+  RunResult,
+  UpgradeLevels,
+  VehicleId,
   VehicleStats,
   ViewState,
 } from "./types";
 import { GarageModal } from "./ui/GarageModal";
 import { HudController } from "./ui/HudController";
+import { MissionBoard } from "./ui/MissionBoard";
 import { Overlays } from "./ui/Overlays";
+import { PosterGenerator } from "./ui/PosterGenerator";
 import { byId } from "./ui/dom";
 import { clamp, lerp, mulberry32, TAU } from "./utils";
 
@@ -87,6 +123,15 @@ const view: ViewState = { x: START_X, y: 0, scale: 30 };
 const hud = new HudController();
 const overlays = new Overlays();
 const save = loadSave();
+if (refreshDaily(save)) persistSave(save, true);
+
+const missionTracker = new MissionTracker(save.missions);
+const missionBoard = new MissionBoard();
+const posterGenerator = new PosterGenerator();
+
+let runMode: RunMode = "standard";
+let loadedChallenge: GhostRecord | null = challengeFromHash(window.location.hash);
+let runConfig: RunConfig = resolveRunConfig("standard");
 
 const audio = new AudioController(save.muted, (muted) => {
   save.muted = muted;
@@ -124,6 +169,57 @@ let hasTouchedGround = false;
 let chunkCursor = 0;
 let items: Item[] = [];
 let lastStageGlobal = 0;
+
+interface RunConfig {
+  seed: number;
+  vehicleId: VehicleId;
+  upgrades: UpgradeLevels;
+  ghost: GhostRecord | null;
+  ghostKind: GhostKind;
+  recordMode: "standard" | "daily";
+  dateKey?: string;
+  modeLabel: string;
+}
+
+interface RunSummary {
+  mode: RunMode;
+  modeLabel: string;
+  vehicleId: VehicleId;
+  distance: number;
+  record: boolean;
+  dailyRecord: boolean;
+  challengeWin: boolean;
+  rivalDistance: number;
+  bounty: number;
+  flips: number;
+  bestCombo: number;
+  highestStunt: string;
+  runCoins: number;
+  seed: number;
+  dateKey: string;
+  stageCount: number;
+  challengeCode: string;
+}
+
+const ghostRecorder = new GhostRecorder();
+let activeGhost: { record: GhostRecord; kind: GhostKind } | null = null;
+let ghostPlayback: GhostPlayback | null = null;
+let ghostPose: GhostPose | null = null;
+let ghostDelta = 0;
+let ghostOvertaken = false;
+let runTime = 0;
+let lastSummary: RunSummary | null = null;
+let posterReady = false;
+
+let runFlips = 0;
+let perfectLandings = 0;
+let wheelieTotal = 0;
+let coinsCollected = 0;
+let bestCombo = 0;
+let highestStunt = "";
+let highestStuntScore = 0;
+let missionEarnings = 0;
+let missionSyncClock = 0;
 
 const jump: JumpState = {
   airborne: false,
@@ -292,7 +388,9 @@ function syncRenderCar(): void {
 
 /* ---------- items ---------- */
 function generateChunk(chunk: number): void {
-  const rng = mulberry32((chunk + 7) * 0x9e3779b1);
+  const rng = mulberry32(
+    (((chunk + 7) * 0x9e3779b1) ^ getWorldSeed()) >>> 0,
+  );
   const baseX = START_X + chunk * CHUNK;
   let coinStart = Number.POSITIVE_INFINITY;
   let fuelX = Number.POSITIVE_INFINITY;
@@ -489,14 +587,26 @@ function finishJump(): void {
   }
 
   if (!car.crashed) {
+    const jumpScore = tier * 2;
+    if (jumpScore > highestStuntScore) {
+      highestStuntScore = jumpScore;
+      highestStunt = stage ? stage.title : "";
+    }
+
     if (flips > 0) {
       const flipReward = FLIP_REWARD * flips;
       reward += flipReward;
+      runFlips += flips;
       jump.nitroTime = Math.min(
         MAX_NITRO_TIME,
         jump.nitroTime + NITRO_FLIP_TIME,
       );
       const direction = airRotation > 0 ? "前空翻" : "后空翻";
+      const stuntScore = flips * 8 + tier;
+      if (stuntScore > highestStuntScore) {
+        highestStuntScore = stuntScore;
+        highestStunt = `${direction} ×${flips}`;
+      }
       toastMain = `${direction} ×${flips} · +${flipReward} 金币`;
       jump.stuntTitle = `${direction} ×${flips}`;
       jump.stuntSubtitle = `+${flipReward} 金币 · 氮气 +${NITRO_FLIP_TIME.toFixed(1)}s`;
@@ -522,6 +632,8 @@ function finishJump(): void {
           PERFECT_MAX_COMBO,
           jump.perfectCombo + 1,
         );
+        perfectLandings += 1;
+        bestCombo = Math.max(bestCombo, jump.perfectCombo);
         const perfectReward = 5 * jump.perfectCombo;
         reward += perfectReward;
         jump.nitroTime = Math.min(
@@ -589,6 +701,7 @@ function collectItem(item: Item): void {
   item.alive = false;
   if (item.type === "coin") {
     runCoins++;
+    coinsCollected++;
     save.coins++;
     persistSave(save);
     audio.coinPickup(runCoins);
@@ -679,9 +792,68 @@ function updateItems(dt: number): void {
 }
 
 /* ---------- run lifecycle ---------- */
+function dailyContext(): {
+  dateKey: string;
+  seed: number;
+  vehicleId: VehicleId;
+} {
+  if (refreshDaily(save)) persistSave(save, true);
+  const seed = dailySeedFor(save.dailyDate);
+  return {
+    dateKey: save.dailyDate,
+    seed,
+    vehicleId: dailyVehicleFor(seed),
+  };
+}
+
+function resolveRunConfig(mode: RunMode): RunConfig {
+  if (mode === "daily") {
+    const context = dailyContext();
+    const config = VEHICLES[context.vehicleId];
+    return {
+      seed: context.seed,
+      vehicleId: context.vehicleId,
+      upgrades: fairUpgrades(),
+      ghost: save.dailyGhost,
+      ghostKind: "pb",
+      recordMode: "daily",
+      dateKey: context.dateKey,
+      modeLabel: `每日试炼 · #${config.number} ${config.name}`,
+    };
+  }
+  if (mode === "challenge" && loadedChallenge) {
+    const ghost = loadedChallenge;
+    const daily = ghost.mode === "daily";
+    const vehicleId = daily
+      ? dailyVehicleFor(ghost.seed)
+      : save.selectedVehicle;
+    const config = VEHICLES[vehicleId];
+    return {
+      seed: ghost.seed,
+      vehicleId,
+      upgrades: daily ? fairUpgrades() : save.upgrades[vehicleId],
+      ghost,
+      ghostKind: "rival",
+      recordMode: daily ? "daily" : "standard",
+      dateKey: daily ? ghost.dateKey : undefined,
+      modeLabel: `战书挑战 · #${config.number} · 目标 ${ghost.distance}m`,
+    };
+  }
+  return {
+    seed: 0,
+    vehicleId: save.selectedVehicle,
+    upgrades: save.upgrades[save.selectedVehicle],
+    ghost: save.bestGhost,
+    ghostKind: "pb",
+    recordMode: "standard",
+    modeLabel: "",
+  };
+}
+
 function resetRun(): void {
-  const config = VEHICLES[save.selectedVehicle];
-  stats = deriveVehicleStats(save.upgrades[save.selectedVehicle]);
+  const config = VEHICLES[runConfig.vehicleId];
+  stats = deriveVehicleStats(runConfig.upgrades);
+  setWorldSeed(runConfig.seed);
   physics.setVehicle(config);
   physics.reset();
 
@@ -724,19 +896,49 @@ function resetRun(): void {
   hud.syncImpactFrame(frameFx);
   shake = 0;
 
+  runTime = 0;
+  runFlips = 0;
+  perfectLandings = 0;
+  wheelieTotal = 0;
+  coinsCollected = 0;
+  bestCombo = 0;
+  highestStunt = "";
+  highestStuntScore = 0;
+  missionEarnings = 0;
+  missionSyncClock = 0;
+  ghostOvertaken = false;
+  ghostDelta = 0;
+  ghostPose = null;
+  activeGhost = runConfig.ghost
+    ? { record: runConfig.ghost, kind: runConfig.ghostKind }
+    : null;
+  ghostPlayback = activeGhost ? new GhostPlayback(activeGhost.record) : null;
+  ghostRecorder.reset({
+    mode: runConfig.recordMode,
+    seed: runConfig.seed,
+    dateKey: runConfig.dateKey,
+    vehicleId: runConfig.vehicleId,
+  });
+  missionTracker.reset();
+
   items = [];
   particles.clear();
   chunkCursor = 0;
   ensureChunksAhead();
   snapVisualCar();
+  hud.setModeChip(
+    runMode === "standard" ? "" : runConfig.modeLabel,
+    runMode,
+  );
   hud.update(snapshot(), true);
+  missionBoard.sync(save.missions, true);
 }
 
 function snapshot(): HudSnapshot {
   const stage = stageInfoAt(distance);
   return {
     distance,
-    best: save.best,
+    best: runMode === "daily" ? save.dailyBest : save.best,
     coins: save.coins,
     runCoins,
     fuel,
@@ -753,7 +955,14 @@ function snapshot(): HudSnapshot {
   };
 }
 
-function startRun(): void {
+function startRun(mode: RunMode = runMode): void {
+  if (mode === "challenge" && !loadedChallenge) {
+    audio.deny();
+    hud.showToast("尚无战书", "先在首页载入好友的挑战码");
+    return;
+  }
+  runMode = mode;
+  runConfig = resolveRunConfig(mode);
   if (garage.isOpen) garage.close();
   audio.ensure();
   overlays.hideAll();
@@ -762,8 +971,30 @@ function startRun(): void {
   clearPressed();
   accumulator = 0;
   hud.setMode("playing");
+  hud.setModeChip(runConfig.modeLabel, mode);
   hud.update(snapshot(), true);
-  hud.showToast("发车", "按住油门，向山脊进发");
+  missionBoard.sync(save.missions, true);
+
+  const config = VEHICLES[runConfig.vehicleId];
+  if (mode === "daily") {
+    audio.dailyStart();
+    hud.showToast(
+      "每日试炼发车",
+      `${save.dailyDate} · #${config.number} ${config.name} · Lv.5 公平规格`,
+    );
+  } else if (mode === "challenge" && loadedChallenge) {
+    hud.showToast(
+      "战书应战",
+      `目标 ${loadedChallenge.distance}m · 相同种子 ${seedHex(loadedChallenge.seed)}`,
+    );
+  } else if (runConfig.ghost) {
+    hud.showToast(
+      "发车",
+      `PB 幽灵 · ${runConfig.ghost.distance}m 同屏陪跑`,
+    );
+  } else {
+    hud.showToast("发车", "按住油门，向山脊进发");
+  }
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 }
 
@@ -771,7 +1002,9 @@ function pauseGame(): void {
   if (state !== "playing") return;
   state = "paused";
   clearPressed();
+  hud.hideToast();
   hud.setMode("paused");
+  missionBoard.sync(save.missions, true);
   overlays.showPause({
     distance,
     coins: runCoins,
@@ -791,8 +1024,93 @@ function resumeGame(): void {
 function endRun(reason: RunEndReason): void {
   if (state !== "playing") return;
   const finalDistance = Math.floor(distance);
-  const record = finalDistance > save.best;
-  if (record) save.best = finalDistance;
+  const mode = runMode;
+  let record = false;
+  let dailyRecord = false;
+  let challengeWin = false;
+  let endBounty = 0;
+
+  if (mode === "standard") {
+    record = finalDistance > save.best;
+    if (record) save.best = finalDistance;
+  } else if (mode === "daily") {
+    const settlement = settleDaily(save, finalDistance);
+    dailyRecord = settlement.dailyRecord;
+    endBounty += settlement.bounty;
+    record = dailyRecord;
+  } else if (mode === "challenge" && activeGhost) {
+    challengeWin = finalDistance > activeGhost.record.distance;
+    if (challengeWin) endBounty += CHALLENGE_WIN_BOUNTY;
+  }
+
+  const finishedGhost = ghostRecorder.finish(
+    finalDistance,
+    car.x,
+    car.y,
+    car.angle,
+  );
+  if (finishedGhost) {
+    if (mode === "standard" && record) save.bestGhost = finishedGhost;
+    if (mode === "daily" && dailyRecord) save.dailyGhost = finishedGhost;
+  }
+
+  const completedMissions = save.missions.filter(
+    (mission) => mission.done,
+  ).length;
+  if (completedMissions > 0) save.completedMissions += completedMissions;
+  missionTracker.rotate(save.completedMissions);
+
+  if (endBounty > 0) {
+    grantCoins(endBounty);
+    if (challengeWin) audio.challengeWin();
+    else audio.mission();
+  }
+
+  let rivalDistance = 0;
+  let ghostOutcome = "—";
+  if (activeGhost) {
+    rivalDistance = activeGhost.record.distance;
+    const diff = finalDistance - rivalDistance;
+    ghostOutcome =
+      diff > 0
+        ? `领先 ${diff}m`
+        : diff < 0
+          ? `落后 ${Math.abs(diff)}m`
+          : "并驾齐驱";
+  }
+
+  const resultBest = mode === "daily" ? save.dailyBest : save.best;
+  const bountyTotal = missionEarnings + endBounty;
+  lastSummary = {
+    mode,
+    modeLabel: runConfig.modeLabel || "STANDARD RUN",
+    vehicleId: runConfig.vehicleId,
+    distance: finalDistance,
+    record,
+    dailyRecord,
+    challengeWin,
+    rivalDistance,
+    bounty: bountyTotal,
+    flips: runFlips,
+    bestCombo,
+    highestStunt,
+    runCoins,
+    seed: runConfig.seed,
+    dateKey: runConfig.dateKey ?? utcDateKey(),
+    stageCount: Math.min(
+      4,
+      Math.floor(finalDistance / STAGE_LENGTH) + 1,
+    ),
+    challengeCode:
+      finishedGhost && finalDistance >= 1
+        ? encodeGhostCode(finishedGhost)
+        : "",
+  };
+
+  // Prepare the next "again" run. Daily re-rolls automatically at UTC midnight.
+  if (mode === "standard") runConfig = resolveRunConfig("standard");
+  else if (mode === "daily") runConfig = resolveRunConfig("daily");
+
   persistSave(save, true);
 
   state = "over";
@@ -800,27 +1118,46 @@ function endRun(reason: RunEndReason): void {
   hud.setMode("over");
   hud.updateMeta(save.best, save.coins);
   hud.update(snapshot(), true);
-  overlays.showResult({
+  const result: RunResult = {
     distance: finalDistance,
     coins: runCoins,
-    best: save.best,
+    best: resultBest,
     record,
     reason,
-  });
+    mode,
+    challengeWin,
+    rivalDistance,
+    dailyRecord,
+    highlightStunt: highestStunt,
+    ghostOutcome,
+    bounty: bountyTotal,
+  };
+  hud.hideToast();
+  overlays.showResult(result);
+  missionBoard.sync(save.missions, true);
 }
 
 function goHome(): void {
   if (garage.isOpen) garage.close();
   state = "intro";
+  runMode = "standard";
+  if (refreshDaily(save)) persistSave(save, true);
+  runConfig = resolveRunConfig("standard");
+  lastSummary = null;
   clearPressed();
   overlays.hidePause();
   overlays.hideResult();
+  overlays.hidePoster();
+  overlays.hideChallenge();
   hud.setMode("intro");
+  hud.setModeChip("", "standard");
   hud.updateMeta(save.best, save.coins);
   hud.update(snapshot(), true);
   overlays.showIntro();
+  updateModeUi();
   resetRun();
   snapCamera();
+  missionBoard.sync(save.missions, true);
 }
 
 function respawn(auto: boolean): void {
@@ -872,6 +1209,7 @@ function updateWheelie(dt: number): void {
   }
 
   jump.wheelieTime += dt;
+  wheelieTotal += dt;
   if (jump.wheelieTime < WHEELIE_START) return;
   jump.wheelieTick += dt;
   if (jump.wheelieTick < WHEELIE_INTERVAL) return;
@@ -883,9 +1221,66 @@ function updateWheelie(dt: number): void {
   hud.showToast(`单轮平衡 +${WHEELIE_REWARD}`, "后轮着地摩擦火花");
 }
 
+function updateGhost(): void {
+  if (!activeGhost || !ghostPlayback) return;
+  const pose = ghostPlayback.sample(runTime);
+  ghostPose = pose;
+  ghostDelta = distance - ghostProgress(activeGhost.record, pose);
+  if (
+    !ghostOvertaken &&
+    activeGhost.record.distance >= GHOST_MIN_OVERTAKE &&
+    distance >= activeGhost.record.distance
+  ) {
+    ghostOvertaken = true;
+    triggerGhostOvertake();
+  }
+}
+
+function triggerGhostOvertake(): void {
+  const kind = activeGhost?.kind ?? "pb";
+  const color = kind === "pb" ? "#89d8c8" : "#f0b15e";
+  const target = activeGhost?.record.distance ?? 0;
+  audio.overtake();
+  addShake(0.6);
+  particles.spawnShockwave(car.x, car.y, color, 6.2);
+  particles.spawnShockwave(car.x, car.y, "#fff0bd", 4.4);
+  particles.spawnJumpBurst(car.x, car.y, 3, "#fff0bd");
+  hud.showToast(
+    "超越目标 · 刷新山脊领跑线！",
+    `${kind === "pb" ? "PB" : "RIVAL"} ${target}m 已甩在身后`,
+  );
+}
+
+function updateMissions(dt: number): void {
+  const completed = missionTracker.update({
+    distance,
+    flips: runFlips,
+    perfect: perfectLandings,
+    coins: coinsCollected,
+    wheelie: wheelieTotal,
+    stage: distance,
+  });
+  for (const mission of completed) {
+    missionEarnings += mission.reward;
+    grantCoins(mission.reward);
+    particles.spawnShockwave(car.x, car.y, "#f0b15e", 4.4);
+    audio.mission();
+    hud.showToast(
+      `悬赏达成 · ${missionTitle(mission)}`,
+      `+${mission.reward} 金币 · 已入账`,
+    );
+  }
+  missionSyncClock += dt;
+  if (completed.length > 0 || missionSyncClock >= 0.12) {
+    missionSyncClock = 0;
+    missionBoard.sync(save.missions, completed.length > 0);
+  }
+}
+
 /* ---------- fixed-step simulation ---------- */
 function simulate(dt: number): void {
   elapsed += dt;
+  runTime += dt;
   jump.flash = Math.max(0, jump.flash - dt);
   jump.landing = Math.max(0, jump.landing - dt);
   jump.calloutTime = Math.max(0, jump.calloutTime - dt);
@@ -929,6 +1324,7 @@ function simulate(dt: number): void {
     particles.spawnPickup(impact.x, impact.y, "#f0b15e");
     addShake(0.22);
   }
+  ghostRecorder.tick(dt, car.x, car.y, car.angle);
 
   if (car.contactCount > 0 && !car.crashed) {
     stuckTimer =
@@ -990,7 +1386,10 @@ function simulate(dt: number): void {
 
   if (car.crashed) {
     car.crashTimer += dt;
-    if (car.crashTimer > CRASH_SETTLE_TIME) endRun("crash");
+    if (car.crashTimer > CRASH_SETTLE_TIME) {
+      endRun("crash");
+      return;
+    }
   }
 
   if (car.contactCount > 0 && (throttle || brake) && Math.random() < dt * 28) {
@@ -1044,6 +1443,8 @@ function simulate(dt: number): void {
     hud.showToast(`进入赛段 · ${stage.name}`, stage.hint);
   }
 
+  updateGhost();
+  updateMissions(dt);
   updateItems(dt);
   ensureChunksAhead();
   particles.update(dt);
@@ -1060,7 +1461,10 @@ function simulate(dt: number): void {
       hud.showToast("燃油耗尽", "靠惯性寻找下坡");
     }
     const speed = Math.hypot(car.vx, car.vy);
-    if ((speed < 0.9 && emptyTimer > 1.4) || emptyTimer > 15) endRun("fuel");
+    if ((speed < 0.9 && emptyTimer > 1.4) || emptyTimer > 15) {
+      endRun("fuel");
+      return;
+    }
   }
 }
 
@@ -1087,6 +1491,25 @@ function render(time: number): void {
   terrainRenderer.drawVents(rc);
   terrainRenderer.drawMarkers(rc);
   itemRenderer.draw(rc, items);
+
+  let ghostScreenX: number | null = null;
+  if (state !== "intro" && activeGhost && ghostPlayback && ghostPose) {
+    vehicleRenderer.drawGhostMarker(
+      rc,
+      START_X + activeGhost.record.distance,
+      activeGhost.kind,
+      activeGhost.record.distance,
+    );
+    ghostScreenX = vehicleRenderer.drawGhost(
+      rc,
+      VEHICLES[activeGhost.record.vehicleId],
+      ghostPose,
+      activeGhost.record,
+      activeGhost.kind,
+      distance,
+    );
+  }
+
   particles.draw(rc, false);
   jumpFxRenderer.drawAura(rc, renderCar, jump);
   jumpFxRenderer.drawMagnetAura(rc, renderCar, jump);
@@ -1095,6 +1518,20 @@ function render(time: number): void {
   atmosphereRenderer.drawMotes(rc);
   jumpFxRenderer.drawFlash(rc, renderCar, jump);
   jumpFxRenderer.drawCallout(rc, renderCar, jump);
+  if (
+    state === "playing" &&
+    activeGhost &&
+    ghostScreenX !== null &&
+    (ghostScreenX < 0 || ghostScreenX > W) &&
+    Math.abs(ghostDelta) <= GHOST_RADAR_RANGE
+  ) {
+    jumpFxRenderer.drawGhostRadar(
+      rc,
+      ghostScreenX,
+      ghostDelta,
+      activeGhost.kind,
+    );
+  }
   atmosphereRenderer.drawGrain(rc);
 }
 
@@ -1141,8 +1578,10 @@ const garage = new GarageModal(save, {
     hud.updateMeta(save.best, save.coins);
     hud.update(snapshot(), true);
     if (kind !== "upgrade" && state === "intro") {
+      runConfig = resolveRunConfig("standard");
       resetRun();
       snapCamera();
+      updateModeUi();
     }
   },
   onClose: () => {
@@ -1178,6 +1617,17 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
 
   if (code === "Tab") return;
+
+  const challengeOpen = !overlays.challenge.classList.contains("is-hidden");
+  const posterOpen = !overlays.poster.classList.contains("is-hidden");
+  if (challengeOpen || posterOpen) {
+    if (code === "Escape") {
+      event.preventDefault();
+      if (posterOpen) overlays.hidePoster();
+      else overlays.hideChallenge();
+    }
+    return;
+  }
 
   if (state === "intro" && (code === "Enter" || code === "Space")) {
     if (targetTag === "BUTTON") return;
@@ -1270,6 +1720,215 @@ function bindPedal(button: HTMLElement, name: "gas" | "brake"): void {
   button.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
+/* ---------- daily / challenge / share UI ---------- */
+const dailyBtnMeta = byId("dailyBtnMeta");
+const challengeBtnMeta = byId("challengeBtnMeta");
+const challengeBanner = byId("challengeBanner");
+const challengeBannerTarget = byId("challengeBannerTarget");
+const challengeBannerMeta = byId("challengeBannerMeta");
+const challengeInput = byId<HTMLTextAreaElement>("challengeInput");
+const challengeStatus = byId("challengeStatus");
+
+function updateModeUi(): void {
+  const today = utcDateKey();
+  if (save.dailyDate !== today) {
+    refreshDaily(save, today);
+    persistSave(save, true);
+  }
+  const seed = dailySeedFor(save.dailyDate || today);
+  const vehicle = VEHICLES[dailyVehicleFor(seed)];
+  const bestLine = save.dailyBest > 0 ? ` · 今日最佳 ${save.dailyBest}m` : "";
+  dailyBtnMeta.textContent = `${save.dailyDate || today} · #${vehicle.number} ${vehicle.name}${bestLine}`;
+
+  if (loadedChallenge) {
+    const config = VEHICLES[loadedChallenge.vehicleId];
+    challengeBanner.hidden = false;
+    challengeBannerTarget.textContent = `目标 ${loadedChallenge.distance}m`;
+    challengeBannerMeta.textContent = `${loadedChallenge.mode === "daily" ? "DAILY" : "STANDARD"} · #${config.number} ${config.name} · SEED ${seedHex(loadedChallenge.seed)}`;
+    challengeBtnMeta.textContent = `已载入战书 · 目标 ${loadedChallenge.distance}m`;
+  } else {
+    challengeBanner.hidden = true;
+    challengeBtnMeta.textContent = "粘贴挑战码 / 打开好友战书";
+  }
+}
+
+function challengeLink(code: string): string {
+  const base = location.href.split("#")[0] ?? location.href;
+  return `${base}#challenge=${code}`;
+}
+
+function acceptChallenge(record: GhostRecord): void {
+  loadedChallenge = record;
+  try {
+    const code = encodeGhostCode(record);
+    history.replaceState(null, "", challengeLink(code));
+  } catch (_) {
+    /* file:// or restricted history: the banner still works this session */
+  }
+  updateModeUi();
+}
+
+function openChallengeModal(): void {
+  audio.ensure();
+  challengeInput.value = loadedChallenge
+    ? encodeGhostCode(loadedChallenge)
+    : "";
+  challengeStatus.dataset.tone = "";
+  challengeStatus.textContent = loadedChallenge
+    ? `当前已载入战书 · 目标 ${loadedChallenge.distance}m。粘贴新代码可替换。`
+    : "";
+  overlays.showChallenge();
+}
+
+function loadChallengeFromInput(): void {
+  const record = decodeChallengeCode(challengeInput.value);
+  if (!record) {
+    audio.deny();
+    challengeStatus.dataset.tone = "error";
+    challengeStatus.textContent =
+      "挑战码损坏或格式不正确。请确认以 RR2. 开头，并完整复制。";
+    return;
+  }
+  acceptChallenge(record);
+  challengeStatus.dataset.tone = "ok";
+  challengeStatus.textContent = `战书有效 · 目标 ${record.distance}m，已载入首页。`;
+  audio.select();
+  overlays.hideChallenge();
+  hud.showToast("战书已加载", `目标 ${record.distance}m · 点击应战发车`);
+}
+
+function clearLoadedChallenge(): void {
+  loadedChallenge = null;
+  try {
+    const base = location.href.split("#")[0] ?? location.href;
+    history.replaceState(null, "", base);
+  } catch (_) {
+    /* ignore restricted history */
+  }
+  updateModeUi();
+  hud.showToast("战书已移除", "当前将按常规赛发车");
+}
+
+function currentShareCode(): string | null {
+  if (lastSummary) {
+    return lastSummary.distance >= 1 && lastSummary.challengeCode
+      ? lastSummary.challengeCode
+      : null;
+  }
+  if (loadedChallenge && loadedChallenge.distance >= 1) {
+    return encodeGhostCode(loadedChallenge);
+  }
+  return null;
+}
+
+function fallbackCopy(text: string): boolean {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.top = "-9999px";
+  area.style.opacity = "0";
+  area.style.userSelect = "text";
+  area.style.webkitUserSelect = "text";
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch (_) {
+    copied = false;
+  }
+  area.remove();
+  return copied;
+}
+
+async function copyText(
+  text: string,
+  main: string,
+  detail: string,
+): Promise<void> {
+  let copied = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    }
+  } catch (_) {
+    copied = false;
+  }
+  if (!copied) copied = fallbackCopy(text);
+  if (copied) hud.showToast(main, detail);
+  else hud.showToast("复制失败", "请手动选中挑战码复制");
+}
+
+async function copyChallengeLink(): Promise<void> {
+  const code = currentShareCode();
+  if (!code) {
+    hud.showToast("暂无可分享战书", "先完成一程，再复制挑战链接");
+    return;
+  }
+  const target = lastSummary?.distance ?? loadedChallenge?.distance ?? 0;
+  await copyText(
+    challengeLink(code),
+    "战书链接已复制",
+    `目标 ${target}m · 打开链接即可同屏竞速`,
+  );
+}
+
+async function openPoster(): Promise<void> {
+  if (!lastSummary) {
+    hud.showToast("尚无战报", "完成一程后再生成战术战报");
+    return;
+  }
+  const summary = lastSummary;
+  posterReady = false;
+  overlays.showPoster();
+  try {
+    await posterGenerator.render({
+      vehicleId: summary.vehicleId,
+      distance: summary.distance,
+      mode: summary.mode,
+      modeLabel: summary.modeLabel,
+      seed: summary.seed,
+      dateKey: summary.dateKey,
+      record: summary.record,
+      dailyRecord: summary.dailyRecord,
+      challengeWin: summary.challengeWin,
+      runCoins: summary.runCoins,
+      flips: summary.flips,
+      bestCombo: summary.bestCombo,
+      bounty: summary.bounty,
+      stageCount: summary.stageCount,
+      challengeCode: summary.challengeCode,
+      generatedLabel: utcDateKey(),
+    });
+    posterReady = true;
+  } catch (_) {
+    posterReady = false;
+    overlays.hidePoster();
+    hud.showToast("战报生成失败", "请关闭弹窗后重试");
+  }
+}
+
+function downloadPoster(): void {
+  if (!lastSummary) return;
+  if (!posterReady) {
+    hud.showToast("战报尚未生成", "请稍候再下载");
+    return;
+  }
+  try {
+    posterGenerator.download(lastSummary.distance);
+    hud.showToast(
+      "PNG 已生成",
+      `ridge-run-${lastSummary.distance}m.png`,
+    );
+  } catch (_) {
+    posterReady = false;
+    hud.showToast("导出失败", "请重新生成战报后再试");
+  }
+}
+
 /* ---------- boot ---------- */
 function boot(): void {
   resize();
@@ -1281,13 +1940,18 @@ function boot(): void {
 
   overlays.hidePause();
   overlays.hideResult();
+  overlays.hideChallenge();
+  overlays.hidePoster();
   overlays.showIntro();
+  updateModeUi();
 
   state = "intro";
   hud.setMode("intro");
+  hud.setModeChip("", "standard");
   resetRun();
   snapCamera();
   hud.update(snapshot(), true);
+  missionBoard.sync(save.missions, true);
   hud.hideToast();
 
   requestAnimationFrame(frame);
@@ -1298,15 +1962,63 @@ window.addEventListener("keyup", handleKeyUp);
 window.addEventListener("blur", clearPressed);
 window.addEventListener("beforeunload", () => flushSave(save));
 
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden && state === "playing") pauseGame();
+challengeInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    loadChallengeFromInput();
+  }
 });
 
-byId("startBtn").addEventListener("click", startRun);
+window.addEventListener("hashchange", () => {
+  if (!location.hash) {
+    if (loadedChallenge) {
+      loadedChallenge = null;
+      updateModeUi();
+    }
+    return;
+  }
+  const record = challengeFromHash(location.hash);
+  if (record) {
+    loadedChallenge = record;
+    updateModeUi();
+    return;
+  }
+  if (location.hash.startsWith("#challenge=")) {
+    loadedChallenge = null;
+    updateModeUi();
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && state === "playing") pauseGame();
+  else if (!document.hidden && state === "intro") updateModeUi();
+});
+window.addEventListener("focus", () => {
+  if (state === "intro") updateModeUi();
+});
+
+byId("startBtn").addEventListener("click", () => startRun("standard"));
+byId("dailyBtn").addEventListener("click", () => startRun("daily"));
+byId("challengeBtn").addEventListener("click", openChallengeModal);
+byId("challengeStartBtn").addEventListener("click", () =>
+  startRun("challenge"),
+);
+byId("challengeClearBtn").addEventListener("click", clearLoadedChallenge);
+byId("challengeLoadBtn").addEventListener("click", loadChallengeFromInput);
+byId("challengeCloseBtn").addEventListener("click", () =>
+  overlays.hideChallenge(),
+);
+byId("copyChallengeBtn").addEventListener("click", copyChallengeLink);
+byId("posterBtn").addEventListener("click", () => void openPoster());
+byId("posterDownloadBtn").addEventListener("click", downloadPoster);
+byId("posterCopyBtn").addEventListener("click", copyChallengeLink);
+byId("posterCloseBtn").addEventListener("click", () =>
+  overlays.hidePoster(),
+);
 byId("pauseBtn").addEventListener("click", pauseGame);
 byId("resumeBtn").addEventListener("click", resumeGame);
-byId("pauseRestartBtn").addEventListener("click", startRun);
-byId("againBtn").addEventListener("click", startRun);
+byId("pauseRestartBtn").addEventListener("click", () => startRun());
+byId("againBtn").addEventListener("click", () => startRun());
 byId("homeBtn").addEventListener("click", goHome);
 byId("muteBtn").addEventListener("click", () => {
   audio.ensure();

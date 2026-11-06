@@ -15,7 +15,7 @@ import type {
   UpdraftVent,
 } from "../types";
 import { clamp, lerp, mixHex, mulberry32, smoothstep, TAU } from "../utils";
-import { heightAt } from "./terrain";
+import { getWorldSeed, heightAt, onWorldSeedChange } from "./terrain";
 
 interface BiomeDefinition {
   id: BiomeId;
@@ -348,6 +348,9 @@ interface StageProfile {
 
 const profileCache = new Map<number, StageProfile>();
 
+// A new world seed invalidates every cached hazard layout.
+onWorldSeedChange(() => profileCache.clear());
+
 /** Sample the ridge and return low points (visual valleys) for hazards. */
 function valleyCenters(stage: number): number[] {
   const base = START_X + stage * STAGE_LENGTH;
@@ -385,7 +388,8 @@ function profileForStage(stage: number): StageProfile {
 
   if (local === 1 || local === 2) {
     const ice = local === 1;
-    const rng = mulberry32(((stage + 13) * 0x9e3779b1) >>> 0);
+    const seed = getWorldSeed();
+    const rng = mulberry32((((stage + 13) * 0x9e3779b1) ^ seed) >>> 0);
     const count = 3;
     const minLen = ice ? 18 : 14;
     const maxLen = ice ? 32 : 24;
@@ -411,7 +415,8 @@ function profileForStage(stage: number): StageProfile {
   }
 
   if (local === 3) {
-    const rng = mulberry32(((stage + 29) * 0x85ebca6b) >>> 0);
+    const seed = getWorldSeed();
+    const rng = mulberry32((((stage + 29) * 0x85ebca6b) ^ seed) >>> 0);
     const valleys = valleyCenters(stage);
     for (let i = 0; i < 2; i++) {
       profile.vents.push({

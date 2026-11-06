@@ -108,6 +108,8 @@ export class Overlays {
   readonly intro = byId("intro");
   readonly pause = byId("pauseOverlay");
   readonly over = byId("overOverlay");
+  readonly challenge = byId("challengeOverlay");
+  readonly poster = byId("posterOverlay");
 
   private readonly pauseDistance = byId("pauseDistance");
   private readonly pauseCoins = byId("pauseCoins");
@@ -119,7 +121,13 @@ export class Overlays {
   private readonly resultDistance = byId("resultDistance");
   private readonly resultCoins = byId("resultCoins");
   private readonly resultBest = byId("resultBest");
+  private readonly resultBestLabel = byId("resultBestLabel");
+  private readonly resultStunt = byId("resultStunt");
+  private readonly resultGhost = byId("resultGhost");
+  private readonly resultBounty = byId("resultBounty");
   private readonly newRecord = byId("newRecord");
+  private readonly challengeInput = byId<HTMLTextAreaElement>("challengeInput");
+  private readonly posterDownloadBtn = byId<HTMLButtonElement>("posterDownloadBtn");
 
   showIntro(): void {
     openOverlay(this.intro);
@@ -144,9 +152,41 @@ export class Overlays {
     this.resultDistance.innerHTML = `${result.distance}<small>m</small>`;
     this.resultCoins.textContent = String(result.coins);
     this.resultBest.innerHTML = `${result.best}<small>m</small>`;
-    this.newRecord.hidden = !result.record;
+    this.resultBestLabel.textContent =
+      result.mode === "daily" ? "今日最佳" : "个人最佳";
+    this.resultStunt.textContent = result.highlightStunt || "—";
+    this.resultGhost.textContent = result.ghostOutcome || "—";
+    this.resultBounty.textContent = result.bounty > 0 ? `+${result.bounty}` : "+0";
 
-    if (result.reason === "crash") {
+    const achieved = result.record || result.challengeWin || result.dailyRecord;
+    this.overTitle.classList.toggle(
+      "is-long",
+      result.mode === "challenge" && result.challengeWin,
+    );
+    this.newRecord.hidden = !achieved;
+    this.newRecord.textContent = result.challengeWin
+      ? "击败对手 · 战书告捷"
+      : result.dailyRecord
+        ? "今日最佳刷新"
+        : "新的个人纪录";
+
+    if (result.mode === "challenge") {
+      if (result.challengeWin) {
+        this.overTitle.textContent = "挑战成功 · 击败对手";
+        this.overCopy.textContent =
+          "山脊战书已盖章。把这个链接传下去，等待下一位应战者。";
+      } else {
+        const gap = Math.max(0, result.rivalDistance - result.distance);
+        this.overTitle.textContent = "战书未破";
+        this.overCopy.textContent = `距离对手还差 ${gap}m。换一条走线，再向山脊要一次机会。`;
+      }
+    } else if (result.mode === "daily") {
+      this.overTitle.textContent =
+        result.reason === "crash" ? "试炼中止" : "试炼结束";
+      this.overCopy.textContent = result.dailyRecord
+        ? `今日最佳刷新至 ${result.best}m。明日 UTC 零点，新的山脊会重新生成。`
+        : "今日试炼成绩已记录。明日 UTC 零点，新的种子与官方车型会重新抽取。";
+    } else if (result.reason === "crash") {
       this.overTitle.textContent = "翻车出局";
       this.overCopy.textContent = result.record
         ? "虽然失控翻覆，但山脊记住了你的新纪录！"
@@ -164,9 +204,27 @@ export class Overlays {
     closeOverlay(this.over);
   }
 
+  showChallenge(): void {
+    openOverlay(this.challenge, this.challengeInput);
+  }
+
+  hideChallenge(): void {
+    closeOverlay(this.challenge);
+  }
+
+  showPoster(): void {
+    openOverlay(this.poster, this.posterDownloadBtn);
+  }
+
+  hidePoster(): void {
+    closeOverlay(this.poster);
+  }
+
   hideAll(): void {
     closeOverlay(this.intro);
     closeOverlay(this.pause);
     closeOverlay(this.over);
+    closeOverlay(this.challenge);
+    closeOverlay(this.poster);
   }
 }

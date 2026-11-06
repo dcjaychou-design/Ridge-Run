@@ -1,6 +1,6 @@
 import { JUMP_STAGES } from "../constants";
-import type { CarState, JumpState, RenderContext } from "../types";
-import { TAU } from "../utils";
+import type { CarState, GhostKind, JumpState, RenderContext } from "../types";
+import { roundRect, TAU, withAlpha } from "../utils";
 
 /** Screen-space stunt feedback: aura, flash, callout text. */
 export class JumpFxRenderer {
@@ -162,6 +162,57 @@ export class JumpFxRenderer {
     ctx.font = `500 ${Math.max(10, Math.min(15, view.scale * 0.44))}px "IBM Plex Mono",monospace`;
     ctx.fillStyle = "#fff0bd";
     ctx.fillText(subtitle, x, y + Math.max(18, view.scale * 0.7));
+    ctx.restore();
+  }
+
+  /**
+   * Edge capsule pointing at an off-screen ghost within radar range.
+   * `delta` is player distance minus ghost progress, in metres.
+   */
+  drawGhostRadar(
+    rc: RenderContext,
+    screenX: number,
+    delta: number,
+    kind: GhostKind,
+  ): void {
+    const { ctx, width: W, height: H } = rc;
+    const left = screenX < 0;
+    const color = kind === "pb" ? "#89d8c8" : "#f0b15e";
+    const label = kind === "pb" ? "PB" : "RIVAL";
+    const text = `${label} ${delta >= 0 ? "+" : ""}${Math.round(delta)}m`;
+    const arrow = left ? "◀" : "▶";
+    const font = '600 11px "IBM Plex Mono", monospace';
+    ctx.save();
+    ctx.font = font;
+    const textWidth = ctx.measureText(text).width;
+    const arrowWidth = ctx.measureText(arrow).width;
+    const pad = 9;
+    const gap = 6;
+    const boxW = textWidth + arrowWidth + gap + pad * 2;
+    const boxH = 24;
+    const x = left ? 14 : W - boxW - 14;
+    const y = H * 0.46;
+    roundRect(ctx, x, y, boxW, boxH, 12);
+    ctx.fillStyle = "rgba(5,15,12,.8)";
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(color, 0.52);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = withAlpha(color, 0.55);
+    ctx.fillRect(x + (left ? 0 : boxW - 2), y + 5, 2, boxH - 10);
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = delta >= 0 ? color : "#eb633a";
+    if (left) {
+      ctx.textAlign = "left";
+      ctx.fillText(arrow, x + pad, y + boxH * 0.5 + 0.5);
+      ctx.textAlign = "right";
+      ctx.fillText(text, x + boxW - pad, y + boxH * 0.5 + 0.5);
+    } else {
+      ctx.textAlign = "left";
+      ctx.fillText(text, x + pad, y + boxH * 0.5 + 0.5);
+      ctx.textAlign = "right";
+      ctx.fillText(arrow, x + boxW - pad, y + boxH * 0.5 + 0.5);
+    }
     ctx.restore();
   }
 

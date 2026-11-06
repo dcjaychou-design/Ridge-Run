@@ -59,6 +59,27 @@ export const MAGNET_DURATION = 10;
 export const MAGNET_MAX_TIME = 12;
 export const MAGNET_RADIUS = 6.8;
 
+/* ---------- ghost replay / challenge codes ---------- */
+export const GHOST_SAMPLE_INTERVAL = 0.15;
+export const GHOST_MAX_FRAMES = 1200;
+export const GHOST_SHARE_MAX_FRAMES = 240;
+export const GHOST_CODE_PREFIX = "RR2.";
+export const GHOST_ALPHA = 0.32;
+export const GHOST_FINISHED_ALPHA = 0.22;
+export const GHOST_RADAR_RANGE = 120;
+export const GHOST_MIN_OVERTAKE = 80;
+
+/* ---------- daily trial / rival challenge ---------- */
+export const DAILY_FAIR_LEVEL = 5;
+export const DAILY_FIRST_MIN_DISTANCE = 150;
+export const DAILY_FIRST_BOUNTY = 40;
+export const DAILY_RECORD_MIN_DISTANCE = 200;
+export const DAILY_RECORD_BOUNTY = 25;
+export const CHALLENGE_WIN_BOUNTY = 35;
+
+/* ---------- pit contracts ---------- */
+export const MISSION_SLOTS = 3;
+
 /* ---------- biomes ---------- */
 export const STAGE_LENGTH = 500;
 export const BIOME_PERIOD = 2000;
