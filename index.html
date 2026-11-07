@@ -43,6 +43,13 @@
           <span id="coinValue">0</span>
           <span id="runCoinDelta" class="coin-delta is-hidden"></span>
         </div>
+        <button class="fov-chip" id="fovBtn" type="button" title="切换镜头可视宽度（快捷键 [ / ]）" aria-label="切换镜头可视宽度">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3"/>
+            <circle cx="12" cy="12" r="2.6"/>
+          </svg>
+          <span id="hudFovValue">36m</span>
+        </button>
         <button class="icon-btn" id="muteBtn" type="button" aria-label="静音" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 9.5h3.4L12 5.7v12.6l-4.6-3.8H4z"/>
@@ -153,6 +160,19 @@
           </button>
         </div>
 
+        <div class="fov-panel" aria-label="镜头视野调节">
+          <div class="fov-head">
+            <span>镜头视野 · CAMERA FOV</span>
+            <b id="introFovValue">36m · 默认近景</b>
+          </div>
+          <div class="fov-controls">
+            <button class="fov-step" id="introFovDecBtn" type="button" title="拉近镜头 ([)" aria-label="拉近镜头">−</button>
+            <input class="fov-range" id="introFovRange" type="range" min="28" max="52" step="1" value="36" aria-label="镜头可视宽度（米）">
+            <button class="fov-step" id="introFovIncBtn" type="button" title="拉远镜头 (])" aria-label="拉远镜头">+</button>
+            <button class="fov-reset" id="introFovResetBtn" type="button" title="恢复默认 36m">重置</button>
+          </div>
+        </div>
+
         <p class="mobile-note">右侧油门 · 左侧刹车 · 腾空时用两只踏板控姿</p>
       </div>
 
@@ -160,6 +180,7 @@
         <div class="drive-card-head"><span>驾驶手册</span><span>NO. 01</span></div>
         <div class="drive-row"><span class="keys"><kbd>A</kbd><kbd>←</kbd></span><span>刹车 / 倒车</span></div>
         <div class="drive-row"><span class="keys"><kbd>D</kbd><kbd>→</kbd></span><span>油门</span></div>
+        <div class="drive-row"><span class="keys"><kbd>[</kbd><kbd>]</kbd></span><span>镜头拉近 / 拉远</span></div>
         <div class="drive-row"><span class="keys"><kbd>P</kbd><kbd>M</kbd></span><span>暂停 / 静音</span></div>
         <div class="drive-row"><span class="keys"><kbd>G</kbd></span><span>整备车库</span></div>
         <p class="drive-note">触屏使用两侧踏板。腾空时，油门抬车头，刹车压车头；收集油桶，别让油表先归零。三款车型与十级改装都在车库里。</p>
@@ -189,6 +210,18 @@
         <div class="stat"><span>燃油</span><strong id="pauseFuel">100<small>%</small></strong></div>
       </div>
       <div class="modal-section">
+        <div class="fov-head">
+          <span>镜头视野 · CAMERA FOV</span>
+          <b id="pauseFovValue">36m · 默认近景</b>
+        </div>
+        <div class="fov-controls">
+          <button class="fov-step" id="pauseFovDecBtn" type="button" title="拉近镜头 ([)" aria-label="拉近镜头">−</button>
+          <input class="fov-range" id="pauseFovRange" type="range" min="28" max="52" step="1" value="36" aria-label="镜头可视宽度（米）">
+          <button class="fov-step" id="pauseFovIncBtn" type="button" title="拉远镜头 (])" aria-label="拉远镜头">+</button>
+          <button class="fov-reset" id="pauseFovResetBtn" type="button" title="恢复默认 36m">重置</button>
+        </div>
+      </div>
+      <div class="modal-section">
         <div class="mission-board-head"><span>进行中的悬赏</span><span>PIT CONTRACTS</span></div>
         <div class="mission-list mission-list--compact" id="pauseMissionList"></div>
       </div>
@@ -199,7 +232,7 @@
         <button class="btn-ghost" id="pauseRestartBtn" type="button">重新开始</button>
         <button class="sound-text btn-ghost" id="pauseMuteBtn" type="button">声音：开</button>
       </div>
-      <div class="modal-mini"><span>P</span><span>继续 / 暂停</span><span>·</span><span>R</span><span>重新开始</span></div>
+      <div class="modal-mini"><span>P</span><span>继续 / 暂停</span><span>·</span><span>R</span><span>重新开始</span><span>·</span><span>[ / ]</span><span>调节视野</span></div>
     </div>
   </section>
 

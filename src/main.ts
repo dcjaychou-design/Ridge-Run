@@ -1,8 +1,11 @@
 import { AudioController } from "./audio/AudioController";
 import {
+  CAMERA_WIDTH_PRESETS,
+  CAMERA_WIDTH_STEP,
   CHALLENGE_WIN_BOUNTY,
   CHUNK,
   CRASH_SETTLE_TIME,
+  DEFAULT_CAMERA_WIDTH,
   FLIP_REWARD,
   FLIP_TOLERANCE,
   FUEL_PICKUP_AMOUNT,
@@ -14,7 +17,9 @@ import {
   MAGNET_DURATION,
   MAGNET_MAX_TIME,
   MAGNET_RADIUS,
+  MAX_CAMERA_WIDTH,
   MAX_NITRO_TIME,
+  MIN_CAMERA_WIDTH,
   NITRO_FLIP_TIME,
   NITRO_PERFECT_TIME,
   NITRO_PICKUP_TIME,
@@ -94,7 +99,7 @@ import type {
   ViewState,
 } from "./types";
 import { GarageModal } from "./ui/GarageModal";
-import { HudController } from "./ui/HudController";
+import { HudController, cameraWidthTag } from "./ui/HudController";
 import { MissionBoard } from "./ui/MissionBoard";
 import { Overlays } from "./ui/Overlays";
 import { PosterGenerator } from "./ui/PosterGenerator";
@@ -282,6 +287,17 @@ function clearPressed(): void {
 }
 
 /* ---------- camera ---------- */
+function computeBaseScale(width: number, cameraWidth: number): number {
+  const targetWidth = clamp(
+    Math.round(cameraWidth),
+    MIN_CAMERA_WIDTH,
+    MAX_CAMERA_WIDTH,
+  );
+  // 默认可视宽度进一步拉近至 36 世界单位（上限 58 保证 2K/超宽屏同步拉近），并按用户设定比例联动上下限
+  const zoomRatio = DEFAULT_CAMERA_WIDTH / targetWidth;
+  return clamp(width / targetWidth, 16 * zoomRatio, 58 * zoomRatio);
+}
+
 function resize(): void {
   W = window.innerWidth;
   H = window.innerHeight;
@@ -290,8 +306,60 @@ function resize(): void {
   canvas.height = Math.max(1, Math.floor(H * DPR));
   canvas.style.width = `${W}px`;
   canvas.style.height = `${H}px`;
-  baseScale = clamp(W / 46, 16, 38);
+  baseScale = computeBaseScale(W, save.cameraWidth);
   if (state === "intro") camera.scale = baseScale * 1.015;
+}
+
+function setCameraWidth(
+  nextWidth: number,
+  options: { announce?: boolean; sound?: boolean } = {},
+): void {
+  const clamped = clamp(
+    Math.round(nextWidth),
+    MIN_CAMERA_WIDTH,
+    MAX_CAMERA_WIDTH,
+  );
+  const changed = clamped !== save.cameraWidth;
+  save.cameraWidth = clamped;
+  baseScale = computeBaseScale(W, clamped);
+  hud.setCameraWidth(clamped);
+  persistSave(save);
+  if (options.sound && changed) {
+    audio.ensure();
+    audio.select();
+  }
+  if (options.announce) {
+    hud.showToast(
+      `镜头视野 · ${clamped}m`,
+      `${cameraWidthTag(clamped)} · 按 [ / ] 可随时微调`,
+    );
+  }
+}
+
+function stepCameraWidth(delta: number): void {
+  const next = clamp(
+    save.cameraWidth + delta,
+    MIN_CAMERA_WIDTH,
+    MAX_CAMERA_WIDTH,
+  );
+  if (next === save.cameraWidth) {
+    audio.ensure();
+    audio.deny();
+    hud.showToast(
+      `镜头视野 · ${next}m`,
+      delta < 0 ? "已达最近视野下限" : "已达最远视野上限",
+    );
+    return;
+  }
+  setCameraWidth(next, { announce: true, sound: true });
+}
+
+function cycleCameraPreset(): void {
+  const current = save.cameraWidth;
+  let nextIndex = CAMERA_WIDTH_PRESETS.findIndex((preset) => preset > current);
+  if (nextIndex < 0) nextIndex = 0;
+  const next = CAMERA_WIDTH_PRESETS[nextIndex]!;
+  setCameraWidth(next, { announce: true, sound: true });
 }
 
 function targetCamera(): CameraState {
@@ -1651,6 +1719,22 @@ function handleKeyDown(event: KeyboardEvent): void {
     audio.toggleMuted();
     return;
   }
+  if (
+    targetTag !== "INPUT" &&
+    targetTag !== "TEXTAREA" &&
+    (state === "intro" || state === "playing" || state === "paused")
+  ) {
+    if (code === "BracketLeft" || code === "Minus") {
+      event.preventDefault();
+      stepCameraWidth(-CAMERA_WIDTH_STEP);
+      return;
+    }
+    if (code === "BracketRight" || code === "Equal") {
+      event.preventDefault();
+      stepCameraWidth(CAMERA_WIDTH_STEP);
+      return;
+    }
+  }
   if (code === "KeyP" || code === "Escape") {
     if (state === "playing") {
       event.preventDefault();
@@ -1936,6 +2020,7 @@ function boot(): void {
 
   document.body.classList.toggle("is-muted", save.muted);
   hud.setMuted(save.muted);
+  hud.setCameraWidth(save.cameraWidth);
   hud.updateMeta(save.best, save.coins);
 
   overlays.hidePause();
@@ -2028,6 +2113,33 @@ byId("pauseMuteBtn").addEventListener("click", () => {
   audio.ensure();
   audio.toggleMuted();
 });
+byId("fovBtn").addEventListener("click", cycleCameraPreset);
+byId<HTMLInputElement>("introFovRange").addEventListener("input", (event) => {
+  const val = Number((event.currentTarget as HTMLInputElement).value);
+  setCameraWidth(val);
+});
+byId<HTMLInputElement>("pauseFovRange").addEventListener("input", (event) => {
+  const val = Number((event.currentTarget as HTMLInputElement).value);
+  setCameraWidth(val);
+});
+byId("introFovDecBtn").addEventListener("click", () =>
+  stepCameraWidth(-CAMERA_WIDTH_STEP),
+);
+byId("introFovIncBtn").addEventListener("click", () =>
+  stepCameraWidth(CAMERA_WIDTH_STEP),
+);
+byId("introFovResetBtn").addEventListener("click", () =>
+  setCameraWidth(DEFAULT_CAMERA_WIDTH, { announce: true, sound: true }),
+);
+byId("pauseFovDecBtn").addEventListener("click", () =>
+  stepCameraWidth(-CAMERA_WIDTH_STEP),
+);
+byId("pauseFovIncBtn").addEventListener("click", () =>
+  stepCameraWidth(CAMERA_WIDTH_STEP),
+);
+byId("pauseFovResetBtn").addEventListener("click", () =>
+  setCameraWidth(DEFAULT_CAMERA_WIDTH, { announce: true, sound: true }),
+);
 byId("garageHomeBtn").addEventListener("click", openGarage);
 byId("resultUpgradeBtn").addEventListener("click", openGarage);
 

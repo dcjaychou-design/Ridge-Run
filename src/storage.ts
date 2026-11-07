@@ -1,6 +1,9 @@
 import {
+  DEFAULT_CAMERA_WIDTH,
   LEGACY_SAVE_KEY,
+  MAX_CAMERA_WIDTH,
   MAX_UPGRADE_LEVEL,
+  MIN_CAMERA_WIDTH,
   MISSION_SLOTS,
   SAVE_KEY,
   VEHICLE_ORDER,
@@ -32,6 +35,7 @@ export function defaultSave(): GameSave {
     best: 0,
     coins: 0,
     muted: false,
+    cameraWidth: DEFAULT_CAMERA_WIDTH,
     selectedVehicle: "rally",
     unlockedVehicles: ["rally"],
     upgrades: {
@@ -137,6 +141,11 @@ function normalize(raw: unknown): GameSave {
   save.best = Math.max(0, Math.floor(Number(source.best) || 0));
   save.coins = Math.max(0, Math.floor(Number(source.coins) || 0));
   save.muted = !!source.muted;
+  const rawCameraWidth = Number(source.cameraWidth);
+  save.cameraWidth =
+    Number.isFinite(rawCameraWidth) && rawCameraWidth > 0
+      ? clamp(Math.round(rawCameraWidth), MIN_CAMERA_WIDTH, MAX_CAMERA_WIDTH)
+      : DEFAULT_CAMERA_WIDTH;
 
   const unlocked = new Set<VehicleId>(["rally"]);
   if (Array.isArray(source.unlockedVehicles)) {

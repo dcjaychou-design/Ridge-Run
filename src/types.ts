@@ -61,6 +61,7 @@ export interface GameSave {
   best: number;
   coins: number;
   muted: boolean;
+  cameraWidth: number;
   selectedVehicle: VehicleId;
   unlockedVehicles: VehicleId[];
   upgrades: Record<VehicleId, UpgradeLevels>;

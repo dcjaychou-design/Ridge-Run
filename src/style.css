@@ -860,3 +860,65 @@ kbd{
   .poster-frame{max-height:calc(100dvh - 224px);display:flex;align-items:center;justify-content:center}
   #posterCanvas{width:auto;height:auto;max-width:100%;max-height:calc(100dvh - 224px);margin:0 auto}
 }
+
+/* ---------- camera fov controls ---------- */
+.fov-chip{
+  height:34px;display:inline-flex;align-items:center;gap:6px;padding:0 9px;
+  border:1px solid var(--line-soft);background:var(--glass);color:var(--paper);
+  font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:background .18s ease,border-color .18s ease,transform .18s ease,color .18s ease;
+}
+.fov-chip:hover{background:rgba(21,45,36,.72);border-color:var(--line);color:var(--amber);transform:translateY(-1px)}
+.fov-chip:active{transform:translateY(0) scale(.96)}
+.fov-chip svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--amber)}
+
+.fov-panel{
+  max-width:620px;margin-top:10px;padding:9px 13px 10px;
+  border:1px solid var(--line-soft);background:rgba(5,15,12,.38);
+}
+.fov-head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  font-family:var(--mono);font-size:7.5px;letter-spacing:.15em;color:rgba(244,232,210,.52);text-transform:uppercase;
+}
+.fov-head b{font-weight:500;color:var(--amber);font-size:9px;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.fov-controls{display:grid;grid-template-columns:28px minmax(0,1fr) 28px auto;align-items:center;gap:8px;margin-top:7px}
+.fov-step,.fov-reset{
+  height:26px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line-soft);background:rgba(5,15,12,.52);color:var(--paper);
+  font-family:var(--mono);font-size:11px;line-height:1;
+  transition:background .16s ease,border-color .16s ease,color .16s ease;
+}
+.fov-reset{padding:0 9px;font-size:8.5px;letter-spacing:.08em;color:var(--paper-dim)}
+.fov-step:hover:not(:disabled),.fov-reset:hover:not(:disabled){
+  background:rgba(240,177,94,.14);border-color:rgba(240,177,94,.45);color:var(--amber);
+}
+.fov-step:disabled,.fov-reset:disabled{opacity:.32;cursor:default}
+.fov-range{
+  -webkit-appearance:none;appearance:none;width:100%;height:4px;margin:0;
+  background:rgba(244,232,210,.16);outline:none;cursor:pointer;
+}
+.fov-range:focus-visible{outline:1px solid var(--amber);outline-offset:4px}
+.fov-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;
+  background:var(--amber);border:2px solid var(--ink);box-shadow:0 0 10px rgba(240,177,94,.55);
+  transition:transform .14s ease,background .14s ease;
+}
+.fov-range::-webkit-slider-thumb:hover{transform:scale(1.15);background:#ffd08a}
+.fov-range::-moz-range-thumb{
+  width:13px;height:13px;border-radius:50%;
+  background:var(--amber);border:2px solid var(--ink);box-shadow:0 0 10px rgba(240,177,94,.55);
+  transition:transform .14s ease,background .14s ease;
+}
+
+@media (max-width:760px){
+  .fov-chip{height:38px;padding:0 8px;font-size:9.5px}
+  .fov-panel{margin-top:8px;padding:8px 10px 9px}
+  .fov-controls{grid-template-columns:30px minmax(0,1fr) 30px auto;gap:6px}
+  .fov-step,.fov-reset{height:28px}
+}
+
+@media (max-height:620px){
+  .fov-panel{margin-top:7px;padding:6px 10px 7px}
+  .fov-controls{margin-top:5px}
+}

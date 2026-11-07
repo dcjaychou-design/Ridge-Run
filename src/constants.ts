@@ -11,6 +11,13 @@ export const START_X = 6;
 export const CHUNK = 44;
 export const GOAL_STEP = 1 / 120;
 
+/* ---------- camera ---------- */
+export const DEFAULT_CAMERA_WIDTH = 36;
+export const MIN_CAMERA_WIDTH = 28;
+export const MAX_CAMERA_WIDTH = 52;
+export const CAMERA_WIDTH_STEP = 2;
+export const CAMERA_WIDTH_PRESETS = [32, 36, 41, 46] as const;
+
 export const GRAVITY = 10.2;
 export const SPRING = 29000;
 export const DAMPER = 1650;

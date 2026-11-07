@@ -1,11 +1,21 @@
 import {
+  DEFAULT_CAMERA_WIDTH,
   JUMP_STAGES,
   MAGNET_DURATION,
+  MAX_CAMERA_WIDTH,
   MAX_NITRO_TIME,
+  MIN_CAMERA_WIDTH,
 } from "../constants";
 import type { FrameFxState, GameState, HudSnapshot } from "../types";
 import { clamp, formatCoins } from "../utils";
 import { byId } from "./dom";
+
+export function cameraWidthTag(width: number): string {
+  if (width <= 33) return "特写近景";
+  if (width <= 38) return width === DEFAULT_CAMERA_WIDTH ? "默认近景" : "标准近景";
+  if (width <= 43) return "均衡中景";
+  return "广角远景";
+}
 
 export class HudController {
   private readonly app = byId("app");
@@ -26,6 +36,17 @@ export class HudController {
   private readonly pauseBtn = byId<HTMLButtonElement>("pauseBtn");
   private readonly muteBtn = byId<HTMLButtonElement>("muteBtn");
   private readonly pauseMuteBtn = byId<HTMLButtonElement>("pauseMuteBtn");
+  private readonly hudFovValue = byId("hudFovValue");
+  private readonly introFovValue = byId("introFovValue");
+  private readonly pauseFovValue = byId("pauseFovValue");
+  private readonly introFovRange = byId<HTMLInputElement>("introFovRange");
+  private readonly pauseFovRange = byId<HTMLInputElement>("pauseFovRange");
+  private readonly introFovDecBtn = byId<HTMLButtonElement>("introFovDecBtn");
+  private readonly introFovIncBtn = byId<HTMLButtonElement>("introFovIncBtn");
+  private readonly introFovResetBtn = byId<HTMLButtonElement>("introFovResetBtn");
+  private readonly pauseFovDecBtn = byId<HTMLButtonElement>("pauseFovDecBtn");
+  private readonly pauseFovIncBtn = byId<HTMLButtonElement>("pauseFovIncBtn");
+  private readonly pauseFovResetBtn = byId<HTMLButtonElement>("pauseFovResetBtn");
   private readonly toast = byId("toast");
   private readonly toastMain = byId("toastMain");
   private readonly toastDetail = byId("toastDetail");
@@ -189,6 +210,26 @@ export class HudController {
     this.muteBtn.setAttribute("aria-label", label);
     this.muteBtn.setAttribute("aria-pressed", muted ? "true" : "false");
     this.pauseMuteBtn.textContent = muted ? "声音：关" : "声音：开";
+  }
+
+  setCameraWidth(width: number): void {
+    const w = clamp(Math.round(width), MIN_CAMERA_WIDTH, MAX_CAMERA_WIDTH);
+    const label = `${w}m · ${cameraWidthTag(w)}`;
+    this.hudFovValue.textContent = `${w}m`;
+    this.introFovValue.textContent = label;
+    this.pauseFovValue.textContent = label;
+    this.introFovRange.value = String(w);
+    this.pauseFovRange.value = String(w);
+
+    const atMin = w <= MIN_CAMERA_WIDTH;
+    const atMax = w >= MAX_CAMERA_WIDTH;
+    const atDefault = w === DEFAULT_CAMERA_WIDTH;
+    this.introFovDecBtn.disabled = atMin;
+    this.pauseFovDecBtn.disabled = atMin;
+    this.introFovIncBtn.disabled = atMax;
+    this.pauseFovIncBtn.disabled = atMax;
+    this.introFovResetBtn.disabled = atDefault;
+    this.pauseFovResetBtn.disabled = atDefault;
   }
 
   syncImpactFrame(state: FrameFxState): void {
