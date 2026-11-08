@@ -1752,6 +1752,11 @@ function handleKeyDown(event: KeyboardEvent): void {
     }
     return;
   }
+  if (code === "KeyH" && (state === "paused" || state === "over")) {
+    event.preventDefault();
+    goHome();
+    return;
+  }
   if (code === "KeyG" && (state === "intro" || state === "over")) {
     event.preventDefault();
     openGarage();
@@ -2103,6 +2108,7 @@ byId("posterCloseBtn").addEventListener("click", () =>
 byId("pauseBtn").addEventListener("click", pauseGame);
 byId("resumeBtn").addEventListener("click", resumeGame);
 byId("pauseRestartBtn").addEventListener("click", () => startRun());
+byId("pauseHomeBtn").addEventListener("click", goHome);
 byId("againBtn").addEventListener("click", () => startRun());
 byId("homeBtn").addEventListener("click", goHome);
 byId("muteBtn").addEventListener("click", () => {

@@ -393,7 +393,7 @@ kbd{
   font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase;
 }
 .record-note::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--signal);box-shadow:0 0 10px rgba(235,99,58,.7)}
-.modal-mini{display:flex;align-items:center;gap:9px;margin-top:18px;font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:rgba(244,232,210,.36)}
+.modal-mini{display:flex;align-items:center;gap:9px;row-gap:6px;flex-wrap:wrap;margin-top:18px;font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:rgba(244,232,210,.36)}
 .sound-text{color:rgba(244,232,210,.52)}
 .sound-text:hover{color:var(--paper)}
 
