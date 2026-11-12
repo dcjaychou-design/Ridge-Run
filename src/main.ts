@@ -56,6 +56,7 @@ import {
 } from "./ghost/GhostSystem";
 import type { GhostPose } from "./ghost/GhostSystem";
 import { MissionTracker, missionTitle } from "./missions";
+import { LATEST_NOTICE_ID, NOTICES } from "./notices";
 import {
   biomePaletteAt,
   stageInfoAt,
@@ -89,6 +90,8 @@ import type {
   Item,
   JumpState,
   JumpTier,
+  NoticeCategory,
+  NoticeEntry,
   RenderContext,
   RunEndReason,
   RunMode,
@@ -1034,6 +1037,7 @@ function startRun(mode: RunMode = runMode): void {
   if (garage.isOpen) garage.close();
   audio.ensure();
   overlays.hideAll();
+  overlays.hideNotice();
   resetRun();
   state = "playing";
   clearPressed();
@@ -1217,6 +1221,7 @@ function goHome(): void {
   overlays.hideResult();
   overlays.hidePoster();
   overlays.hideChallenge();
+  overlays.hideNotice();
   hud.setMode("intro");
   hud.setModeChip("", "standard");
   hud.updateMeta(save.best, save.coins);
@@ -1664,6 +1669,156 @@ function openGarage(): void {
   garage.open();
 }
 
+/* ---------- pit bulletin ---------- */
+const noticeBtn = byId<HTMLButtonElement>("noticeBtn");
+const noticeDot = byId("noticeDot");
+const noticeVersion = byId("noticeVersion");
+const noticeList = byId("noticeList");
+const noticeTabUpdate = byId<HTMLButtonElement>("noticeTabUpdate");
+const noticeTabBulletin = byId<HTMLButtonElement>("noticeTabBulletin");
+const noticeOkBtn = byId<HTMLButtonElement>("noticeOkBtn");
+const noticeCloseBtn = byId<HTMLButtonElement>("noticeCloseBtn");
+let noticeCategory: NoticeCategory = "update";
+
+function updateNoticeBadge(): void {
+  const unread = save.lastSeenNoticeId !== LATEST_NOTICE_ID;
+  noticeDot.hidden = !unread;
+  noticeBtn.classList.toggle("has-unread", unread);
+  noticeBtn.setAttribute(
+    "aria-label",
+    unread ? "山脊公报（有未读更新）" : "山脊公报",
+  );
+  // The entry button advertises the newest tagged release, even when the
+  // latest bulletin itself carries no version.
+  const latestVersioned = NOTICES.find((entry) => entry.version);
+  if (latestVersioned?.version) {
+    noticeVersion.textContent = latestVersioned.version.replace(/\.0$/, "");
+  }
+}
+
+function createNoticeCard(entry: NoticeEntry): HTMLElement {
+  const card = document.createElement("article");
+  card.className = "notice-card";
+  card.dataset.noticeId = entry.id;
+  if (entry.pinned) card.classList.add("is-pinned");
+
+  const head = document.createElement("header");
+  head.className = "notice-card-head";
+
+  const titleWrap = document.createElement("div");
+  titleWrap.className = "notice-card-title";
+  if (entry.pinned) {
+    const pin = document.createElement("span");
+    pin.className = "notice-pin";
+    pin.textContent = "PINNED";
+    titleWrap.appendChild(pin);
+  }
+  const title = document.createElement("h3");
+  title.textContent = entry.title;
+  titleWrap.appendChild(title);
+  head.appendChild(titleWrap);
+
+  if (entry.version) {
+    const version = document.createElement("span");
+    version.className = "notice-version";
+    version.textContent = entry.version;
+    head.appendChild(version);
+  }
+  card.appendChild(head);
+
+  const date = document.createElement("p");
+  date.className = "notice-date";
+  date.textContent = entry.date;
+  card.appendChild(date);
+
+  const summary = document.createElement("p");
+  summary.className = "notice-summary";
+  summary.textContent = entry.summary;
+  card.appendChild(summary);
+
+  const items = document.createElement("ul");
+  items.className = "notice-items";
+  for (const item of entry.items) {
+    const row = document.createElement("li");
+    row.className = "notice-item";
+
+    const tag = document.createElement("span");
+    tag.className = "notice-tag";
+    tag.dataset.tone = item.tone;
+    tag.textContent = item.tag;
+
+    const text = document.createElement("span");
+    text.className = "notice-item-text";
+    text.textContent = item.text;
+
+    row.append(tag, text);
+    items.appendChild(row);
+  }
+  card.appendChild(items);
+
+  return card;
+}
+
+function renderNoticeList(category: NoticeCategory): void {
+  const entries: NoticeEntry[] = [
+    ...NOTICES.filter((entry) => entry.category === category && entry.pinned),
+    ...NOTICES.filter((entry) => entry.category === category && !entry.pinned),
+  ];
+  noticeList.replaceChildren();
+  if (entries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "notice-empty";
+    empty.textContent = "这一栏还没有新的公报。";
+    noticeList.appendChild(empty);
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const entry of entries) fragment.appendChild(createNoticeCard(entry));
+  noticeList.appendChild(fragment);
+}
+
+function setNoticeTab(category: NoticeCategory, focusTab = false): void {
+  noticeCategory = category;
+  const isUpdate = category === "update";
+  noticeTabUpdate.classList.toggle("is-active", isUpdate);
+  noticeTabBulletin.classList.toggle("is-active", !isUpdate);
+  noticeTabUpdate.setAttribute("aria-selected", String(isUpdate));
+  noticeTabBulletin.setAttribute("aria-selected", String(!isUpdate));
+  noticeTabUpdate.tabIndex = isUpdate ? 0 : -1;
+  noticeTabBulletin.tabIndex = isUpdate ? -1 : 0;
+  renderNoticeList(category);
+  noticeList.scrollTop = 0;
+  if (focusTab) (isUpdate ? noticeTabUpdate : noticeTabBulletin).focus();
+}
+
+function openNoticeModal(initialTab?: NoticeCategory): void {
+  if (state !== "intro") return;
+  audio.ensure();
+  setNoticeTab(initialTab ?? noticeCategory);
+  save.lastSeenNoticeId = LATEST_NOTICE_ID;
+  persistSave(save, true);
+  updateNoticeBadge();
+  audio.select();
+  overlays.showNotice(noticeOkBtn);
+}
+
+function handleNoticeTabKey(event: KeyboardEvent): void {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  event.preventDefault();
+  setNoticeTab(noticeCategory === "update" ? "bulletin" : "update", true);
+}
+
+noticeBtn.addEventListener("click", () => openNoticeModal());
+noticeTabUpdate.addEventListener("click", () => setNoticeTab("update"));
+noticeTabBulletin.addEventListener("click", () => setNoticeTab("bulletin"));
+noticeTabUpdate.addEventListener("keydown", handleNoticeTabKey);
+noticeTabBulletin.addEventListener("keydown", handleNoticeTabKey);
+noticeOkBtn.addEventListener("click", () => overlays.hideNotice());
+noticeCloseBtn.addEventListener("click", () => overlays.hideNotice());
+overlays.notice.addEventListener("click", (event) => {
+  if (event.target === overlays.notice) overlays.hideNotice();
+});
+
 /* ---------- events ---------- */
 function handleKeyDown(event: KeyboardEvent): void {
   if (event.repeat) return;
@@ -1686,6 +1841,14 @@ function handleKeyDown(event: KeyboardEvent): void {
 
   if (code === "Tab") return;
 
+  if (overlays.isNoticeOpen()) {
+    if (code === "Escape" || code === "Enter" || code === "NumpadEnter") {
+      event.preventDefault();
+      overlays.hideNotice();
+    }
+    return;
+  }
+
   const challengeOpen = !overlays.challenge.classList.contains("is-hidden");
   const posterOpen = !overlays.poster.classList.contains("is-hidden");
   if (challengeOpen || posterOpen) {
@@ -1694,6 +1857,12 @@ function handleKeyDown(event: KeyboardEvent): void {
       if (posterOpen) overlays.hidePoster();
       else overlays.hideChallenge();
     }
+    return;
+  }
+
+  if (code === "KeyN" && state === "intro") {
+    event.preventDefault();
+    openNoticeModal();
     return;
   }
 
@@ -2032,7 +2201,9 @@ function boot(): void {
   overlays.hideResult();
   overlays.hideChallenge();
   overlays.hidePoster();
+  overlays.hideNotice();
   overlays.showIntro();
+  updateNoticeBadge();
   updateModeUi();
 
   state = "intro";

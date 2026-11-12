@@ -105,7 +105,19 @@
   <section class="intro" id="intro" aria-labelledby="gameTitle">
     <div class="intro-top">
       <div class="stamp"><span class="stamp-dot" aria-hidden="true"></span><span>阿尔卑斯试炼道 · 无尽赛段</span></div>
-      <div class="record is-empty"><span>个人最佳距离</span><strong id="introBest" class="is-empty">尚无</strong><small>M</small></div>
+      <div class="intro-tools">
+        <button class="notice-btn" id="noticeBtn" type="button" aria-haspopup="dialog" aria-controls="noticeOverlay" title="山脊公报（快捷键 N）">
+          <span class="notice-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M6 16.6h12l-1.7-2.5v-4a4.3 4.3 0 0 0-8.6 0v4L6 16.6Z"/>
+              <path d="M10 19.1a2.1 2.1 0 0 0 4 0"/>
+            </svg>
+          </span>
+          <span class="notice-btn-copy"><strong>山脊公报</strong><small id="noticeVersion">v1.2</small></span>
+          <span class="notice-dot" id="noticeDot" hidden></span>
+        </button>
+        <div class="record is-empty"><span>个人最佳距离</span><strong id="introBest" class="is-empty">尚无</strong><small>M</small></div>
+      </div>
     </div>
 
     <div class="intro-main">
@@ -183,6 +195,7 @@
         <div class="drive-row"><span class="keys"><kbd>[</kbd><kbd>]</kbd></span><span>镜头拉近 / 拉远</span></div>
         <div class="drive-row"><span class="keys"><kbd>P</kbd><kbd>M</kbd></span><span>暂停 / 静音</span></div>
         <div class="drive-row"><span class="keys"><kbd>G</kbd></span><span>整备车库</span></div>
+        <div class="drive-row"><span class="keys"><kbd>N</kbd></span><span>山脊公报</span></div>
         <p class="drive-note">触屏使用两侧踏板。腾空时，油门抬车头，刹车压车头；收集油桶，别让油表先归零。三款车型与十级改装都在车库里。</p>
 
         <div class="mission-board">
@@ -308,6 +321,29 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
         </button>
         <button class="btn-ghost" id="posterCopyBtn" type="button">复制挑战链接</button>
+      </footer>
+    </div>
+  </section>
+
+  <section class="screen screen--notice is-hidden" id="noticeOverlay" role="dialog" aria-modal="true" aria-labelledby="noticeTitle" aria-hidden="true" inert>
+    <div class="notice-modal">
+      <header class="notice-head">
+        <div class="notice-heading">
+          <p class="eyebrow">PIT BULLETIN · 山脊公报</p>
+          <h2 id="noticeTitle">山脊公报与更新日志</h2>
+        </div>
+        <button class="icon-btn notice-close" id="noticeCloseBtn" type="button" aria-label="关闭山脊公报">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="notice-tabs" role="tablist" aria-label="公报分类">
+        <button class="notice-tab is-active" id="noticeTabUpdate" type="button" role="tab" aria-selected="true" aria-controls="noticeList">更新日志</button>
+        <button class="notice-tab" id="noticeTabBulletin" type="button" role="tab" aria-selected="false" aria-controls="noticeList" tabindex="-1">山脊公告</button>
+      </div>
+      <div class="notice-list" id="noticeList" role="region" aria-label="公报内容" aria-live="polite" tabindex="0"></div>
+      <footer class="notice-foot">
+        <span class="notice-foot-note">按版本归档 · 读完自动标记已阅</span>
+        <button class="btn-primary" id="noticeOkBtn" type="button">知道了</button>
       </footer>
     </div>
   </section>

@@ -110,6 +110,7 @@ export class Overlays {
   readonly over = byId("overOverlay");
   readonly challenge = byId("challengeOverlay");
   readonly poster = byId("posterOverlay");
+  readonly notice = byId("noticeOverlay");
 
   private readonly pauseDistance = byId("pauseDistance");
   private readonly pauseCoins = byId("pauseCoins");
@@ -220,11 +221,24 @@ export class Overlays {
     closeOverlay(this.poster);
   }
 
+  showNotice(focusTarget?: HTMLElement | null): void {
+    openOverlay(this.notice, focusTarget ?? undefined);
+  }
+
+  hideNotice(): void {
+    closeOverlay(this.notice);
+  }
+
+  isNoticeOpen(): boolean {
+    return isOverlayOpen(this.notice);
+  }
+
   hideAll(): void {
     closeOverlay(this.intro);
     closeOverlay(this.pause);
     closeOverlay(this.over);
     closeOverlay(this.challenge);
     closeOverlay(this.poster);
+    closeOverlay(this.notice);
   }
 }

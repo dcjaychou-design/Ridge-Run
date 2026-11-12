@@ -50,6 +50,7 @@ export function defaultSave(): GameSave {
     dailyGhost: null,
     missions: defaultMissions(),
     completedMissions: 0,
+    lastSeenNoticeId: "",
   };
 }
 
@@ -189,6 +190,12 @@ function normalize(raw: unknown): GameSave {
     Math.floor(Number(source.completedMissions) || 0),
   );
   save.missions = normalizeMissions(source.missions, save.completedMissions);
+
+  // v2.2 additions: the pit bulletin remembers which entry was last opened.
+  save.lastSeenNoticeId =
+    typeof source.lastSeenNoticeId === "string"
+      ? source.lastSeenNoticeId
+      : "";
 
   return save;
 }

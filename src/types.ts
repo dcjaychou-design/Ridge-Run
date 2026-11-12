@@ -72,6 +72,8 @@ export interface GameSave {
   dailyGhost: GhostRecord | null;
   missions: MissionState[];
   completedMissions: number;
+  /** Id of the newest pit-bulletin entry the player has opened. */
+  lastSeenNoticeId: string;
 }
 
 export interface VehicleConfig {
@@ -368,6 +370,30 @@ export interface HudSnapshot {
 }
 
 export type RunEndReason = "fuel" | "crash";
+
+/* ---------- pit bulletin / changelog ---------- */
+export type NoticeCategory = "update" | "bulletin";
+
+export type NoticeTagTone = "new" | "tune" | "fix" | "event";
+
+export interface NoticeEntryItem {
+  tag: string;
+  tone: NoticeTagTone;
+  text: string;
+}
+
+export interface NoticeEntry {
+  /** Stable unique id, e.g. `"update-v1.2.0"`. */
+  id: string;
+  category: NoticeCategory;
+  version?: string;
+  /** Display date, e.g. `"2026-11-12"`. */
+  date: string;
+  title: string;
+  summary: string;
+  pinned?: boolean;
+  items: NoticeEntryItem[];
+}
 
 export interface RunResult {
   distance: number;
