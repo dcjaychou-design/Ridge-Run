@@ -153,6 +153,8 @@ HUD 顶部同时显示当前 `STAGE 0X · 赛段名`，以及激活中的 `NITRO
 | `H` | 回到主页（暂停 / 结算页） |
 | `M` | 静音 |
 | `G` | 打开车库（首页 / 结算页） |
+| `[` / `]`（或 `-` / `=`） | 调节镜头视野（28–52m，每次 2m） |
+| `N` | 打开山脊公报（首页） |
 | 触屏 | 右侧油门 · 左侧刹车；腾空时同时按住双踏板稳定车身 |
 | 首页按钮 | 「每日试炼」进入当日固定种子 · 「战书挑战」粘贴挑战码或查看已加载战书 |
 | 结算页按钮 | 复制战书链接 / 生成战术战报 / 升级车辆 / 回到主页 |
@@ -212,8 +214,10 @@ src/
 
 ### 存档兼容
 
-`ridge-run-v2` 新增字段为 `bestGhost`、`dailyDate`、`dailyBest`、`dailyFirstClaimed`、`dailyGhost`、`missions` 与 `completedMissions`。
+`ridge-run-v2` 新增字段为 `cameraWidth`、`bestGhost`、`dailyDate`、`dailyBest`、`dailyFirstClaimed`、`dailyGhost`、`missions`、`completedMissions` 与 `lastSeenNoticeId`。
 
 - 旧 `ridge-run-v2` 存档会自动补齐新字段，保留原有金币、常规赛最佳、已解锁车辆与全部改装等级。
+- `cameraWidth` 记录镜头可视宽度，缺失或非法时回落到默认 `36m`，并限制在 `28–52m` 范围内。
+- `lastSeenNoticeId` 记录最近一次打开的山脊公报条目；缺失时视为从未阅读，首页会亮起未读红点，打开公报后立即持久化。
 - 旧 `ridge-run-v1` 存档继续走迁移：继承 `best` 与 `coins`，初始化车库后写入 `ridge-run-v2`。
 - 损坏的幽灵记录（版本、mode/seed 不一致、帧数非法、坐标越界）会被丢弃为 `null`；非法悬赏会按当前完成数重新生成，避免坏档导致发车失败。

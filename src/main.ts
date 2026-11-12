@@ -1784,17 +1784,38 @@ function setNoticeTab(category: NoticeCategory, focusTab = false): void {
   noticeTabBulletin.classList.toggle("is-active", !isUpdate);
   noticeTabUpdate.setAttribute("aria-selected", String(isUpdate));
   noticeTabBulletin.setAttribute("aria-selected", String(!isUpdate));
-  noticeTabUpdate.tabIndex = isUpdate ? 0 : -1;
-  noticeTabBulletin.tabIndex = isUpdate ? -1 : 0;
+  noticeList.setAttribute(
+    "aria-labelledby",
+    isUpdate ? "noticeTabUpdate" : "noticeTabBulletin",
+  );
   renderNoticeList(category);
   noticeList.scrollTop = 0;
   if (focusTab) (isUpdate ? noticeTabUpdate : noticeTabBulletin).focus();
 }
 
-function openNoticeModal(initialTab?: NoticeCategory): void {
-  if (state !== "intro") return;
+function switchNoticeTab(category: NoticeCategory, focusTab = false): void {
+  if (category === noticeCategory) {
+    if (focusTab) (category === "update" ? noticeTabUpdate : noticeTabBulletin).focus();
+    return;
+  }
   audio.ensure();
-  setNoticeTab(initialTab ?? noticeCategory);
+  audio.select();
+  setNoticeTab(category, focusTab);
+}
+
+function openNoticeModal(initialTab?: NoticeCategory): void {
+  if (
+    state !== "intro" ||
+    garage.isOpen ||
+    !overlays.challenge.classList.contains("is-hidden")
+  ) {
+    return;
+  }
+  audio.ensure();
+  const unread = save.lastSeenNoticeId !== LATEST_NOTICE_ID;
+  const targetTab =
+    initialTab ?? (unread ? (NOTICES[0]?.category ?? "update") : noticeCategory);
+  setNoticeTab(targetTab);
   save.lastSeenNoticeId = LATEST_NOTICE_ID;
   persistSave(save, true);
   updateNoticeBadge();
@@ -1805,12 +1826,12 @@ function openNoticeModal(initialTab?: NoticeCategory): void {
 function handleNoticeTabKey(event: KeyboardEvent): void {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
   event.preventDefault();
-  setNoticeTab(noticeCategory === "update" ? "bulletin" : "update", true);
+  switchNoticeTab(noticeCategory === "update" ? "bulletin" : "update", true);
 }
 
 noticeBtn.addEventListener("click", () => openNoticeModal());
-noticeTabUpdate.addEventListener("click", () => setNoticeTab("update"));
-noticeTabBulletin.addEventListener("click", () => setNoticeTab("bulletin"));
+noticeTabUpdate.addEventListener("click", () => switchNoticeTab("update"));
+noticeTabBulletin.addEventListener("click", () => switchNoticeTab("bulletin"));
 noticeTabUpdate.addEventListener("keydown", handleNoticeTabKey);
 noticeTabBulletin.addEventListener("keydown", handleNoticeTabKey);
 noticeOkBtn.addEventListener("click", () => overlays.hideNotice());
@@ -1842,7 +1863,16 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (code === "Tab") return;
 
   if (overlays.isNoticeOpen()) {
-    if (code === "Escape" || code === "Enter" || code === "NumpadEnter") {
+    const focusOnTab =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement.classList.contains("notice-tab");
+    if (code === "Escape") {
+      event.preventDefault();
+      overlays.hideNotice();
+    } else if (
+      (code === "Enter" || code === "NumpadEnter") &&
+      !focusOnTab
+    ) {
       event.preventDefault();
       overlays.hideNotice();
     }

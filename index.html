@@ -113,7 +113,7 @@
               <path d="M10 19.1a2.1 2.1 0 0 0 4 0"/>
             </svg>
           </span>
-          <span class="notice-btn-copy"><strong>山脊公报</strong><small id="noticeVersion">v1.2</small></span>
+          <span class="notice-btn-copy"><strong>山脊公报</strong><small id="noticeVersion">v2.2</small></span>
           <span class="notice-dot" id="noticeDot" hidden></span>
         </button>
         <div class="record is-empty"><span>个人最佳距离</span><strong id="introBest" class="is-empty">尚无</strong><small>M</small></div>
@@ -338,9 +338,9 @@
       </header>
       <div class="notice-tabs" role="tablist" aria-label="公报分类">
         <button class="notice-tab is-active" id="noticeTabUpdate" type="button" role="tab" aria-selected="true" aria-controls="noticeList">更新日志</button>
-        <button class="notice-tab" id="noticeTabBulletin" type="button" role="tab" aria-selected="false" aria-controls="noticeList" tabindex="-1">山脊公告</button>
+        <button class="notice-tab" id="noticeTabBulletin" type="button" role="tab" aria-selected="false" aria-controls="noticeList">山脊公告</button>
       </div>
-      <div class="notice-list" id="noticeList" role="region" aria-label="公报内容" aria-live="polite" tabindex="0"></div>
+      <div class="notice-list" id="noticeList" role="tabpanel" aria-labelledby="noticeTabUpdate" aria-live="polite" tabindex="0"></div>
       <footer class="notice-foot">
         <span class="notice-foot-note">按版本归档 · 读完自动标记已阅</span>
         <button class="btn-primary" id="noticeOkBtn" type="button">知道了</button>

@@ -843,18 +843,6 @@ kbd{
   .toast strong{white-space:nowrap}
 }
 
-@media (max-height:760px) and (min-height:621px){
-  .intro{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
-  .intro-main{padding-top:24px;gap:clamp(24px,3vw,56px)}
-  .wordmark{font-size:clamp(62px,9vw,124px);margin-bottom:14px}
-  .lede{margin-bottom:16px}
-  .cta-row{gap:10px}
-  .mode-row{margin-top:10px}
-  .drive-card .mission-board{display:none}
-  .drive-card .drive-note{display:none}
-  .intro-foot{margin-top:12px;padding-top:8px}
-}
-
 @media (min-width:761px) and (max-height:820px){
   .poster-panel{max-height:calc(100dvh - 32px);padding:14px 16px;gap:9px}
   .poster-frame{max-height:calc(100dvh - 224px);display:flex;align-items:center;justify-content:center}
@@ -921,6 +909,22 @@ kbd{
 @media (max-height:620px){
   .fov-panel{margin-top:7px;padding:6px 10px 7px}
   .fov-controls{margin-top:5px}
+}
+
+/* Common laptop heights: keep the banner, FOV panel and six-row manual in view.
+   Placed after the FOV base rules so these compressions win the cascade. */
+@media (max-height:820px) and (min-height:621px){
+  .intro{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  .intro-main{padding-top:24px;gap:clamp(24px,3vw,56px)}
+  .wordmark{font-size:clamp(62px,9vw,124px);margin-bottom:14px}
+  .lede{margin-bottom:16px}
+  .cta-row{gap:10px}
+  .mode-row{margin-top:10px}
+  .drive-row{padding:6px 0}
+  .fov-panel{margin-top:8px;padding:7px 11px 8px}
+  .drive-card .mission-board{display:none}
+  .drive-card .drive-note{display:none}
+  .intro-foot{margin-top:12px;padding-top:8px}
 }
 
 /* ---------- pit bulletin / changelog (v2.2) ---------- */
