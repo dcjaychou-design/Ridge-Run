@@ -75,12 +75,14 @@ import {
   setWorldSeed,
 } from "./physics/terrain";
 import { AtmosphereRenderer } from "./render/AtmosphereRenderer";
+import { HomeShowcase } from "./render/HomeShowcase";
 import { ItemRenderer } from "./render/ItemRenderer";
 import { JumpFxRenderer } from "./render/JumpFxRenderer";
 import { MountainRenderer } from "./render/MountainRenderer";
 import { ParticleSystem } from "./render/ParticleSystem";
 import { SkyRenderer } from "./render/SkyRenderer";
 import { TerrainRenderer } from "./render/TerrainRenderer";
+import { TrackRenderer } from "./render/TrackRenderer";
 import { VehicleRenderer } from "./render/VehicleRenderer";
 import {
   flushSave,
@@ -271,8 +273,10 @@ const frameFx: FrameFxState = {
 
 /* ---------- renderers ---------- */
 const skyRenderer = new SkyRenderer();
+const homeShowcase = new HomeShowcase();
 const mountainRenderer = new MountainRenderer();
 const terrainRenderer = new TerrainRenderer();
+const trackRenderer = new TrackRenderer();
 const itemRenderer = new ItemRenderer();
 const vehicleRenderer = new VehicleRenderer();
 const jumpFxRenderer = new JumpFxRenderer();
@@ -858,6 +862,7 @@ function resetRun(): void {
 
   items = [];
   particles.clear();
+  trackRenderer.clear();
   chunkCursor = ensureChunksAhead(car.x, 0, items);
   snapVisualCar();
   hud.setModeChip(
@@ -1402,6 +1407,7 @@ function simulate(dt: number): void {
   updateItems(dt);
   chunkCursor = ensureChunksAhead(car.x, chunkCursor, items);
   particles.update(dt);
+  trackRenderer.update(car, dt);
 
   const fuelRatio = fuel / stats.fuelCapacity;
   if (fuelRatio <= LOW_FUEL_RATIO && !lowFuelWarned && !car.crashed) {
@@ -1425,12 +1431,14 @@ function simulate(dt: number): void {
 /* ---------- render ---------- */
 function render(time: number): void {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.clearRect(0, 0, W, H);
 
   makeView(time);
   const stage = stageInfoAt(distance);
   const palette = biomePaletteAt(distance);
-  const rc: RenderContext = {
+  const baseContext: RenderContext = {
     ctx,
     width: W,
     height: H,
@@ -1439,12 +1447,17 @@ function render(time: number): void {
     stage,
     palette,
   };
+  const rc = state === "intro" ? homeShowcase.compose(baseContext, physics.vehicle) : baseContext;
+  const displayedCar = state === "intro" ? homeShowcase.car : renderCar;
   skyRenderer.draw(rc);
-  mountainRenderer.draw(rc, camera.x);
+  mountainRenderer.draw(rc, rc.view.x);
   terrainRenderer.draw(rc);
+  trackRenderer.draw(rc);
   terrainRenderer.drawVents(rc);
-  terrainRenderer.drawMarkers(rc);
-  itemRenderer.draw(rc, items);
+  if (state !== "intro") {
+    terrainRenderer.drawMarkers(rc);
+    itemRenderer.draw(rc, items);
+  }
 
   let ghostScreenX: number | null = null;
   if (state !== "intro" && activeGhost && ghostPlayback && ghostPose) {
@@ -1467,9 +1480,10 @@ function render(time: number): void {
   particles.draw(rc, false);
   jumpFxRenderer.drawAura(rc, renderCar, jump);
   jumpFxRenderer.drawMagnetAura(rc, renderCar, jump);
-  vehicleRenderer.draw(rc, renderCar, physics.vehicle);
+  vehicleRenderer.draw(rc, displayedCar, physics.vehicle);
   particles.draw(rc, true);
   atmosphereRenderer.drawMotes(rc);
+  if (state === "playing") atmosphereRenderer.drawMotion(rc, renderCar.vx, jump.nitroTime > 0);
   jumpFxRenderer.drawFlash(rc, renderCar, jump);
   jumpFxRenderer.drawCallout(rc, renderCar, jump);
   if (

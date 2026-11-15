@@ -2,103 +2,165 @@ import { STAGE_LENGTH, START_X } from "../constants";
 import { stageInfoAt, visiblePatches, visibleVents } from "../physics/biomes";
 import { heightAt } from "../physics/terrain";
 import type { RenderContext, SurfacePatch, UpdraftVent } from "../types";
-import { hash, TAU, withAlpha } from "../utils";
+import { hash, mixHex, TAU, withAlpha } from "../utils";
+import { fbm, pine, stone } from "./scenery";
+
+interface ScreenPoint {
+  x: number;
+  y: number;
+  wx: number;
+  wy: number;
+}
 
 /** Playable ridge, biome-tinted cut faces, ice/mud bands, vents and gates. */
 export class TerrainRenderer {
-  private surfX: number[] = [];
-  private surfY: number[] = [];
   private patchX: number[] = [];
   private patchY: number[] = [];
+  private surfaceBuffer: ScreenPoint[] = [];
   private groundGradKey = "";
   private groundGrad: CanvasGradient | null = null;
+  private grain: CanvasPattern | null = null;
 
   draw(rc: RenderContext): void {
     const { ctx, width: W, height: H, view, palette: p } = rc;
-    const count = this.fillSurfacePoints(rc, 6);
-    if (!count) return;
-    const surfX = this.surfX;
-    const surfY = this.surfY;
-
-    ctx.beginPath();
-    ctx.moveTo(surfX[0]!, H + 30);
-    for (let i = 0; i < count; i++) ctx.lineTo(surfX[i]!, surfY[i]!);
-    ctx.lineTo(surfX[count - 1]!, H + 30);
-    ctx.closePath();
-
-    const gradKey = `${H}|${p.groundTop}|${p.groundUpper}|${p.groundMid}|${p.groundBottom}`;
+    const pts = this.surfacePoints(rc, 5);
+    if (!pts.length) return;
+    this.drawWayside(rc);
+    const land = new Path2D();
+    land.moveTo(pts[0]!.x, H + 40);
+    for (const point of pts) land.lineTo(point.x, point.y);
+    land.lineTo(pts[pts.length - 1]!.x, H + 40);
+    land.closePath();
+    const gradKey = `${ctx.getTransform().a}|${H}|${p.groundTop}|${p.groundUpper}|${p.groundMid}|${p.groundBottom}`;
     if (!this.groundGrad || this.groundGradKey !== gradKey) {
-      const g = ctx.createLinearGradient(0, H * 0.35, 0, H + 20);
-      g.addColorStop(0, p.groundTop);
-      g.addColorStop(0.36, p.groundUpper);
-      g.addColorStop(0.74, p.groundMid);
-      g.addColorStop(1, p.groundBottom);
-      this.groundGrad = g;
-      this.groundGradKey = gradKey;
+      const g = ctx.createLinearGradient(0, H * 0.42, 0, H + 20);
+      g.addColorStop(0, p.groundTop); g.addColorStop(0.3, p.groundUpper);
+      g.addColorStop(0.72, p.groundMid); g.addColorStop(1, p.groundBottom);
+      this.groundGrad = g; this.groundGradKey = gradKey;
     }
-    ctx.fillStyle = this.groundGrad;
-    ctx.fill();
+    ctx.fillStyle = this.groundGrad; ctx.fill(land);
+    ctx.save(); ctx.clip(land);
 
-    this.drawHazards(rc);
-
-    // topographic cut lines under the crest
-    ctx.save();
-    for (let layer = 1; layer <= 4; layer++) {
-      const offset = layer * Math.max(12, view.scale * 0.58);
+    // Rock strata bend with the terrain but break independently of it.
+    for (let layer = 0; layer < 9; layer++) {
+      const depth = (0.38 + layer * 0.78) * view.scale;
       ctx.beginPath();
-      for (let i = 0; i < count; i++) {
-        const yy = surfY[i]! + offset;
-        if (i === 0) ctx.moveTo(surfX[i]!, yy);
-        else ctx.lineTo(surfX[i]!, yy);
+      for (let i = 0; i < pts.length; i++) {
+        const pt = pts[i]!;
+        const y = pt.y + depth + (fbm(pt.wx * 0.24, layer * 17) - 0.5) * view.scale * 0.85;
+        if (i === 0) ctx.moveTo(pt.x, y); else ctx.lineTo(pt.x, y);
       }
-      const alpha =
-        layer === 1 ? 0.26 : layer === 3 ? 0.13 : layer === 2 ? 0.07 : 0.05;
-      ctx.strokeStyle = withAlpha(p.strataColor, alpha);
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = layer % 3 === 0 ? withAlpha(p.strataColor, 0.2) : withAlpha(p.groundBottom, 0.3);
+      ctx.lineWidth = view.scale * (layer % 3 === 0 ? 0.07 : 0.12);
       ctx.stroke();
+    }
+    // Embedded, bevelled rock fragments with stable world coordinates.
+    const first = Math.floor(view.x - W / view.scale / 2) - 2;
+    const end = Math.ceil(view.x + W / view.scale / 2) + 2;
+    for (let i = first; i <= end; i++) {
+      for (let j = 0; j < 5; j++) {
+        const q = hash(i * 7.9 + j * 31);
+        if (q < 0.35) continue;
+        const wx = i + q;
+        const x = this.toScreenX(rc, wx);
+        const y = this.toScreenY(rc, heightAt(wx)) + (0.5 + j * 1.6 + q) * view.scale;
+        if (y > H + 30) continue;
+        const r = view.scale * (0.055 + q * 0.16);
+        stone(ctx, x, y, r, mixHex(p.rockColor, p.groundBottom, 0.3),
+          mixHex(p.rockColor, p.strataColor, 0.18), i + j * 91);
+        ctx.strokeStyle = withAlpha(p.groundBottom, 0.25);
+        ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.moveTo(x, y + 1); ctx.lineTo(x - r * 0.4, y + r * 2.8); ctx.stroke();
+      }
+    }
+    if (!this.grain) this.grain = this.makeGrain(ctx);
+    if (this.grain) {
+      const matrix = new DOMMatrix().translate(W * 0.5 - view.x * view.scale, H * 0.5 - view.y * view.scale);
+      this.grain.setTransform(matrix);
+      ctx.fillStyle = this.grain; ctx.globalAlpha = 0.44;
+      ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
     }
     ctx.restore();
 
-    // fine strata running through the cut face
-    ctx.save();
-    for (let i = 0; i < 17; i++) {
-      const wx =
-        view.x - W / view.scale / 2 + (i / 16) * (W / view.scale) + hash(i * 3.1) * 5;
-      const x = this.toScreenX(rc, wx);
-      const y = this.toScreenY(rc, heightAt(wx));
-      const len = 8 + hash(i * 9.7) * 34;
-      ctx.strokeStyle = withAlpha(p.strataColor, 0.035 + hash(i * 5.2) * 0.05);
-      ctx.lineWidth = 1;
+    // A soil shoulder and moss/snow lip read as a physical road thickness.
+    const trace = (offset: number): void => {
       ctx.beginPath();
-      ctx.moveTo(x, y + 18 + hash(i * 2.3) * 42);
-      ctx.lineTo(
-        x + (hash(i * 7.4) - 0.5) * 22,
-        y + 18 + hash(i * 2.3) * 42 + len,
-      );
-      ctx.stroke();
-    }
+      pts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y + offset) : ctx.lineTo(pt.x, pt.y + offset));
+    };
+    ctx.save(); ctx.clip(land); ctx.lineJoin = "round";
+    trace(view.scale * 0.17);
+    ctx.strokeStyle = mixHex(p.groundTop, p.strataColor, 0.35);
+    ctx.lineWidth = view.scale * 0.38; ctx.stroke();
+    trace(view.scale * 0.37);
+    ctx.strokeStyle = withAlpha(p.groundBottom, 0.52); ctx.lineWidth = view.scale * 0.07; ctx.stroke();
+    trace(0); ctx.strokeStyle = p.rim; ctx.lineWidth = view.scale * 0.16; ctx.stroke();
+    trace(0); ctx.strokeStyle = withAlpha(p.rimSoft, 0.65); ctx.lineWidth = 1.3; ctx.stroke();
     ctx.restore();
-
-    // rim light: biome-tinted, still unmistakably Alpine Dusk
-    ctx.save();
-    ctx.beginPath();
-    for (let i = 0; i < count; i++) {
-      if (i === 0) ctx.moveTo(surfX[i]!, surfY[i]!);
-      else ctx.lineTo(surfX[i]!, surfY[i]!);
-    }
-    ctx.strokeStyle = withAlpha(p.rimHalo, p.nightFactor > 0.5 ? 0.24 : 0.3);
-    ctx.lineWidth = 9;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-    ctx.strokeStyle = p.rim;
-    ctx.lineWidth = 2.2;
-    ctx.stroke();
-    ctx.strokeStyle = withAlpha(p.rimSoft, 0.52);
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-    ctx.restore();
-
+    this.drawHazards(rc);
+    this.drawGrass(rc);
     this.drawSurfaceDetail(rc);
+  }
+
+  private makeGrain(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+    const c = document.createElement("canvas"); c.width = c.height = 192;
+    const k = c.getContext("2d")!;
+    const image = k.createImageData(192, 192);
+    for (let i = 0; i < image.data.length; i += 4) {
+      const q = hash(i * 0.17), light = q > 0.5;
+      image.data[i] = light ? 223 : 8;
+      image.data[i + 1] = light ? 215 : 19;
+      image.data[i + 2] = light ? 177 : 17;
+      image.data[i + 3] = Math.abs(q - 0.5) * 70;
+    }
+    k.putImageData(image, 0, 0);
+    return ctx.createPattern(c, "repeat");
+  }
+
+  private drawWayside(rc: RenderContext): void {
+    const { ctx, width: W, view, palette: p } = rc;
+    const left = Math.floor((view.x - W / view.scale / 2 - 8) / 6);
+    const right = Math.ceil((view.x + W / view.scale / 2 + 8) / 6);
+    for (let i = left; i <= right; i++) {
+      const q = hash(i * 9.31), wx = i * 6 + q * 3;
+      if (wx > START_X - 3 && wx < START_X + 13) continue;
+      const x = this.toScreenX(rc, wx), y = this.toScreenY(rc, heightAt(wx)) + 4;
+      if (p.treeAlpha > 0.1 && q > 0.33) {
+        const h = (1.6 + q * 2.9) * view.scale;
+        pine(ctx, x, y, h, mixHex(p.treeColor, p.nearTop, 0.3),
+          mixHex(p.treeColor, p.rim, 0.28), i * 31, p.snowCap);
+      } else if (q < 0.3) {
+        stone(ctx, x, y, (0.25 + q) * view.scale, p.rockColor,
+          mixHex(p.rockColor, p.crestColor, 0.25), i * 17);
+      }
+    }
+  }
+
+  private drawGrass(rc: RenderContext): void {
+    const { ctx, width: W, view, palette: p, time } = rc;
+    const first = Math.floor((view.x - W / view.scale / 2 - 1) / 0.28);
+    const end = Math.ceil((view.x + W / view.scale / 2 + 1) / 0.28);
+    ctx.save();
+    for (let i = first; i <= end; i++) {
+      const q = hash(i * 4.7), wx = i * 0.28;
+      const x = this.toScreenX(rc, wx), y = this.toScreenY(rc, heightAt(wx));
+      if (p.detailStyle === "snow" || p.detailStyle === "rock") {
+        if (q > 0.8) stone(ctx, x, y + 2, view.scale * (0.04 + q * 0.07),
+          p.rockColor, p.rimSoft, i);
+        continue;
+      }
+      const h = view.scale * (0.04 + q * 0.15);
+      const sway = Math.sin(time * 1.7 + wx * 2) * h * 0.18;
+      ctx.strokeStyle = mixHex(p.groundTop, p.rim, q * 0.75);
+      ctx.lineWidth = Math.max(0.65, view.scale * 0.017);
+      ctx.beginPath(); ctx.moveTo(x, y + 1);
+      ctx.quadraticCurveTo(x - h * 0.3, y - h * 0.7, x + sway, y - h);
+      ctx.moveTo(x + 2, y + 1); ctx.lineTo(x + h * 0.4 + sway, y - h * 0.6); ctx.stroke();
+      if (q > 0.94 && p.detailStyle === "pine") {
+        ctx.fillStyle = i % 2 ? "#f2d99c" : "#d4c8cb";
+        ctx.beginPath(); ctx.arc(x + sway, y - h, Math.max(1, view.scale * 0.025), 0, TAU); ctx.fill();
+      }
+    }
+    ctx.restore();
   }
 
   drawMarkers(rc: RenderContext): void {
@@ -189,19 +251,19 @@ export class TerrainRenderer {
     ctx.restore();
   }
 
-  private fillSurfacePoints(rc: RenderContext, stepPx: number): number {
+  private surfacePoints(rc: RenderContext, stepPx: number): ScreenPoint[] {
     const { width: W, view } = rc;
-    const surfX = this.surfX;
-    const surfY = this.surfY;
+    const pts = this.surfaceBuffer;
     let count = 0;
     for (let x = -20; x <= W + 20; x += stepPx) {
       const wx = view.x + (x - W * 0.5) / view.scale;
       const wy = heightAt(wx);
-      surfX[count] = x;
-      surfY[count] = this.toScreenY(rc, wy);
-      count++;
+      const point = pts[count] ?? { x: 0, y: 0, wx: 0, wy: 0 };
+      point.x = x; point.y = this.toScreenY(rc, wy); point.wx = wx; point.wy = wy;
+      pts[count++] = point;
     }
-    return count;
+    pts.length = count;
+    return pts;
   }
 
   /* ---------- ice / mud ---------- */

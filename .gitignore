@@ -3,3 +3,5 @@ dist
 .DS_Store
 Thumbs.db
 *.local
+.artifacts/
+.browser4-cli/

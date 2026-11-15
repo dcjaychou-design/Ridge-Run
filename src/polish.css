@@ -1,0 +1,184 @@
+/* Expedition finish: warm instruments, clear scenery and restrained glass. */
+:root{--glass:rgba(9,29,30,.66);--line:rgba(231,237,218,.25);--line-soft:rgba(231,237,218,.13)}
+.vignette{box-shadow:inset 0 0 150px rgba(3,17,22,.2),inset 0 -60px 90px rgba(3,17,18,.18)}
+.top-scrim{height:170px;background:linear-gradient(180deg,rgba(5,20,26,.64),rgba(5,20,26,.16) 55%,transparent)}
+.bottom-scrim{height:155px;background:linear-gradient(0deg,rgba(4,19,22,.62),transparent)}
+.intro{
+  padding:calc(28px + env(safe-area-inset-top,0px)) max(40px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(40px,env(safe-area-inset-left,0px));
+  background:linear-gradient(90deg,rgba(5,22,24,.76),rgba(5,22,24,.36) 38%,transparent 68%),
+    linear-gradient(0deg,rgba(4,19,20,.92),rgba(4,19,20,.35) 28%,transparent 62%);
+}
+.intro::before{display:none}
+.intro-main{grid-template-columns:minmax(0,650px) 268px;justify-content:space-between;gap:40px;padding-top:90px}
+.intro-copy{max-width:650px;padding-bottom:4px}
+.eyebrow{font-size:10px;letter-spacing:.23em;margin-bottom:18px}
+.wordmark{font-size:clamp(72px,7.5vw,112px);line-height:1.12;letter-spacing:-.07em;flex-wrap:nowrap;margin-bottom:20px;text-shadow:0 8px 40px rgba(0,17,20,.2)}
+.wordmark .outline{-webkit-text-stroke:1px rgba(247,238,215,.85)}
+.wordmark-sun{width:11px;height:11px;margin-left:16px;margin-bottom:.22em;background:#eaa65f;box-shadow:0 0 30px rgba(238,172,98,.3)}
+.lede{font-size:15px;line-height:1.95;color:rgba(244,238,219,.8);margin-bottom:26px}
+.landscape-caption{position:absolute;top:22%;right:5%;display:flex;flex-direction:column;align-items:flex-end;gap:13px;text-shadow:0 2px 12px rgba(5,24,31,.4)}
+.landscape-caption>span{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(245,235,211,.7)}
+.landscape-caption strong{font-size:18px;font-weight:500;letter-spacing:.15em;color:rgba(253,243,218,.9)}
+.landscape-caption .landscape-index{display:flex;align-items:center;gap:12px;color:#f3cd96}
+.landscape-index i{display:block;width:34px;height:1px;background:currentColor;opacity:.6}
+.intro-foot{padding-top:16px;margin-top:24px;color:rgba(223,231,213,.48);font-size:9px;letter-spacing:.14em}
+.stamp{font-size:10px;letter-spacing:.16em}
+.stamp-dot{background:#f0ba73;box-shadow:0 0 14px rgba(243,183,102,.6)}
+.record span{font-size:9px}
+.record strong.is-empty{font-size:20px;font-weight:500}
+.btn-primary{height:52px;border-radius:5px;border-color:#e9bb7e;background:linear-gradient(135deg,#f4d29d,#e5a45f);color:#183234;box-shadow:0 6px 24px rgba(4,17,18,.22),inset 0 1px rgba(255,251,223,.5);font-size:13px;letter-spacing:.08em}
+.btn-primary:hover{background:#f6d6a4;border-color:#ffe1b0;box-shadow:0 7px 30px rgba(239,174,100,.18);transform:translateY(-2px)}
+.btn-ghost,.home-balance,.mode-card,.fov-panel{border-radius:5px;background:rgba(10,30,31,.53);box-shadow:inset 0 1px rgba(239,235,213,.03)}
+.btn-ghost{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.btn-ghost:hover{background:rgba(38,67,62,.7);border-color:rgba(243,215,169,.46)}
+.home-balance{color:#f2d4a1}
+.cta-row{gap:12px}
+.press-hint{font-size:9px;color:rgba(230,235,213,.5)}
+.mode-row{max-width:580px;margin-top:16px;gap:12px}
+.mode-card{min-height:68px;padding:12px 15px;transition:transform .2s,border-color .2s,background .2s}
+.mode-card:hover{transform:translateY(-2px);border-color:rgba(235,191,130,.55);background:rgba(25,53,49,.72)}
+.mode-card-kicker{font-size:8px;letter-spacing:.17em;color:#d9b985}
+.mode-card-body strong{font-size:13px}
+.mode-card-body small{font-size:9px;color:rgba(232,237,219,.58)}
+.intro .fov-panel{max-width:580px;margin-top:12px;padding:12px 15px}
+.fov-head{font-size:9px}
+.fov-step,.fov-reset{border-radius:3px}
+.fov-range{accent-color:#efbf83}
+.drive-card{padding:20px;border:1px solid rgba(231,235,211,.16);border-radius:8px;background:linear-gradient(145deg,rgba(21,46,45,.69),rgba(7,28,29,.75));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 16px 50px rgba(3,18,21,.18),inset 0 1px rgba(246,235,210,.06)}
+.drive-card-head{font-size:9px;padding-bottom:13px}
+.drive-row{grid-template-columns:78px 1fr;padding:8px 0;font-size:11px;color:rgba(240,237,219,.8)}
+kbd{border-radius:3px;box-shadow:0 2px 0 rgba(1,12,16,.2);background:rgba(30,55,53,.5)}
+.drive-note{line-height:1.8;color:rgba(230,235,216,.58)}
+.drive-card .mission-board{margin-top:18px}
+.notice-btn{border-radius:5px;background:rgba(9,29,30,.58);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.notice-btn:hover{background:rgba(36,62,53,.75)}
+.hud{padding-top:calc(22px + env(safe-area-inset-top,0px))}
+.brand-copy strong{font-size:19px;letter-spacing:.13em}
+.brand-copy small{font-size:9px;color:rgba(238,235,212,.7)}
+.brand-mark{width:34px;height:34px}
+.micro{font-size:10px}
+.distance-value{font-size:52px;font-weight:600}
+.distance-unit{font-size:12px}
+.best-line{font-size:9px}
+.stage-chip{border-radius:20px;font-size:9px;padding:5px 10px;letter-spacing:.08em}
+.icon-btn,.coin-chip,.fov-chip{border-radius:5px;height:38px;box-shadow:inset 0 1px rgba(243,233,205,.04)}
+.icon-btn{width:38px}
+.coin-chip{font-size:12px}
+.fuel-panel{border-radius:6px;width:180px;padding:11px 12px}
+.fuel-head{font-size:9px}
+.fuel-track{height:6px;border-radius:2px}
+.fuel-fill{background:linear-gradient(90deg,#d78351,#efc181)}
+.buff-bar{width:180px}
+.buff,.combo-chip{border-radius:4px}
+.pedal{border-color:rgba(236,229,201,.3);background:radial-gradient(circle at 40% 25%,rgba(76,108,90,.6),rgba(10,35,34,.85) 72%);box-shadow:0 12px 30px rgba(3,20,22,.22),inset 0 1px rgba(244,234,209,.2)}
+.pedal--gas{border-color:rgba(245,198,130,.6);background:radial-gradient(circle at 40% 25%,rgba(179,112,58,.65),rgba(54,46,28,.88) 72%);box-shadow:0 12px 30px rgba(3,20,22,.2),inset 0 1px rgba(251,221,166,.28)}
+.pedal::before{border-color:rgba(244,232,210,.14);inset:5px}
+.speedo{bottom:30px;width:144px;padding:12px 12px 10px;border:1px solid rgba(229,235,210,.14);border-radius:8px;background:rgba(7,29,30,.57);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.speed-value{font-size:32px}
+.speed-label{font-size:9px}
+.toast{border-radius:0 5px 5px 0;box-shadow:0 10px 30px rgba(2,18,21,.18)}
+.screen{background:rgba(6,24,28,.68);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.modal{padding:30px;border:1px solid rgba(231,235,216,.18);border-radius:12px;background:linear-gradient(145deg,rgba(25,50,48,.92),rgba(8,28,31,.95));box-shadow:0 25px 80px rgba(2,15,20,.3),inset 0 1px rgba(243,235,209,.06)}
+.modal h2{font-size:clamp(40px,5vw,64px);line-height:1.1}
+.modal-copy{font-size:13px;color:rgba(239,237,220,.68)}
+.stat strong{font-size:32px}
+.garage-panel{border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at 80% 0%,rgba(239,184,111,.11),transparent 55%),linear-gradient(145deg,#173431,#081e22)}
+.vehicle-preview{border-radius:8px;background:radial-gradient(ellipse at 66% 20%,rgba(241,198,124,.2),transparent 65%),linear-gradient(180deg,#294a49,#0b2428)}
+.preview-grid{opacity:.3;transform:perspective(230px) rotateX(32deg) scale(1.25);transform-origin:center 75%}
+.vehicle-arrow,.upgrade-buy,.garage-balance{border-radius:5px}
+.vehicle-specs{border-radius:5px;overflow:hidden}
+.garage-head,.garage-foot{background:rgba(8,26,28,.2)}
+.garage-heading h2{font-size:36px}
+.upgrade-row{padding-top:15px;padding-bottom:15px}
+.upgrade-pip{border-radius:1px}
+.notice-panel,.challenge-modal,.poster-panel{border-radius:10px}
+:focus-visible{outline:2px solid #f6cd92;outline-offset:4px}
+
+@media (max-width:1100px) and (min-width:761px){
+  .intro{padding-left:28px;padding-right:28px}
+  .intro-main{grid-template-columns:minmax(0,1fr) 240px;gap:28px}
+  .wordmark{font-size:clamp(64px,7.8vw,88px)}
+  .drive-card{padding:16px}
+  .home-balance{display:none}
+  .press-hint{display:none}
+}
+@media (max-width:760px){
+  .intro{padding:calc(20px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));background:linear-gradient(0deg,rgba(5,23,25,.96),rgba(5,23,25,.72) 35%,rgba(5,23,25,.06) 65%,transparent)}
+  .intro-main{grid-template-columns:1fr;padding-top:70px;gap:0}
+  .intro-copy{padding:0}
+  .landscape-caption{top:20%;right:24px;gap:8px}
+  .landscape-caption strong{font-size:13px;letter-spacing:.08em}
+  .landscape-caption>span{font-size:7px}
+  .landscape-caption .landscape-index{gap:8px}
+  .landscape-index i{width:20px}
+  .eyebrow{font-size:9px;margin-bottom:10px}
+  .wordmark{font-size:clamp(58px,15.4vw,90px);margin-bottom:13px;line-height:1.12}
+  .wordmark-sun{width:7px;height:7px;margin-left:10px}
+  .lede{font-size:12px;line-height:1.85;margin-bottom:18px}
+  .drive-card{display:none}
+  .cta-row{gap:8px}
+  .cta-row .btn-primary{height:48px;padding:0 16px;gap:12px;font-size:12px}
+  .cta-row .btn-ghost{height:48px;padding:0 12px;font-size:11px}
+  .home-balance{height:48px;padding:0 9px;font-size:11px}
+  .home-balance small{display:none}
+  .mode-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+  .mode-card{min-height:64px;padding:10px 11px}
+  .mode-card-body strong{font-size:12px}
+  .mode-card-body small{font-size:8px}
+  .intro .fov-panel{padding:9px 11px;margin-top:10px}
+  .fov-head{font-size:8px}
+  .mobile-note{font-size:8px;color:rgba(235,237,218,.55);margin-top:10px}
+  .intro-foot{font-size:7px;margin-top:15px;padding-top:12px}
+  .intro-foot>span:last-child{display:none}
+  .stamp{font-size:8px}
+  .stamp-extra{display:none}
+  .intro-top{gap:12px}
+  .hud{grid-template-columns:1fr auto;padding-top:calc(14px + env(safe-area-inset-top,0px));gap:8px}
+  .distance-value{font-size:40px}
+  .distance-unit{font-size:10px}
+  .micro{font-size:8px}
+  .best-line{font-size:8px}
+  .stage-chip{font-size:7px;padding:4px 8px}
+  .fuel-panel,.buff-bar{width:140px}
+  .fuel-panel{padding:8px 9px}
+  .fuel-head{font-size:8px}
+  .coin-chip,.icon-btn,.fov-chip{height:34px}
+  .icon-btn{width:34px}
+  .speedo{bottom:18px;width:100px;padding:9px}
+  .speed-value{font-size:26px}
+  .speed-label{font-size:7px}
+  .pedal{width:80px;height:80px}
+  .modal{padding:22px}
+  .modal h2{font-size:40px}
+  .modal-copy{font-size:12px}
+  .stat strong{font-size:26px}
+  .garage-panel{border-radius:0}
+  .garage-heading h2{font-size:28px}
+}
+@media (max-height:740px) and (min-width:761px){
+  .intro{padding-top:20px;padding-bottom:16px}
+  .intro-main{padding-top:24px}
+  .wordmark{font-size:78px;margin-bottom:12px}
+  .lede{font-size:13px;margin-bottom:18px}
+  .drive-card .mission-board{display:none}
+  .drive-card .drive-note{display:none}
+  .mode-card{min-height:58px;padding:9px 12px}
+  .intro .fov-panel{padding:8px 12px}
+  .intro-foot{margin-top:16px;padding-top:12px}
+}
+@media (max-height:620px){
+  .intro{overflow-y:auto;padding-top:14px;padding-bottom:12px}
+  .intro-main{display:block;padding-top:20px;margin-top:auto}
+  .intro-copy{max-width:560px}
+  .wordmark{font-size:clamp(46px,8vw,70px);margin-bottom:12px}
+  .eyebrow{margin-bottom:8px;font-size:8px}
+  .lede,.drive-card,.landscape-caption,.intro .fov-panel,.mobile-note{display:none}
+  .intro-foot{margin-top:14px;padding-top:10px}
+  .mode-row{margin-top:10px}
+  .mode-card{min-height:50px;padding:8px 11px}
+  .modal{padding:20px;max-height:calc(100dvh - 32px);overflow-y:auto}
+  .speedo{bottom:16px;padding:7px 10px}
+}
+@media (prefers-reduced-motion:reduce){
+  .mode-card,.btn-primary,.btn-ghost{transition:none}
+}

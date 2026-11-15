@@ -1,6 +1,6 @@
 import { JUMP_STAGES } from "../constants";
 import type { CarState, GhostKind, JumpState, RenderContext } from "../types";
-import { roundRect, TAU, withAlpha } from "../utils";
+import { clamp, roundRect, TAU, withAlpha } from "../utils";
 
 /** Screen-space stunt feedback: aura, flash, callout text. */
 export class JumpFxRenderer {
@@ -18,7 +18,7 @@ export class JumpFxRenderer {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const glow = ctx.createRadialGradient(sx, sy, s * 0.12, sx, sy, radius);
-    glow.addColorStop(0, `${stage.color}55`);
+    glow.addColorStop(0, `${stage.color}28`);
     glow.addColorStop(0.48, `${stage.color}20`);
     glow.addColorStop(1, `${stage.color}00`);
     ctx.fillStyle = glow;
@@ -28,7 +28,7 @@ export class JumpFxRenderer {
 
     ctx.translate(sx, sy);
     ctx.rotate(car.angle);
-    ctx.globalAlpha = 0.42 + tier * 0.12;
+    ctx.globalAlpha = 0.22 + tier * 0.06;
     ctx.strokeStyle = stage.color;
     ctx.lineWidth = Math.max(1, s * 0.035);
     for (let i = 0; i < tier + 1; i++) {
@@ -127,41 +127,30 @@ export class JumpFxRenderer {
 
   drawCallout(rc: RenderContext, car: CarState, jump: JumpState): void {
     if (jump.calloutTime <= 0 || !jump.calloutTier) return;
-    const { ctx, view, time } = rc;
+    const { ctx, view, width: W, height: H } = rc;
     const stage = JUMP_STAGES[jump.calloutTier - 1]!;
-    const color = jump.flashColor;
-    const duration = jump.calloutReward ? 1.2 : 1.05;
-    const progress = 1 - jump.calloutTime / duration;
-    const alpha = Math.min(1, jump.calloutTime * 3);
-    const x = this.toScreenX(rc, car.x);
-    const y =
-      this.toScreenY(rc, car.y) - 54 - progress * 24 + Math.sin(time * 9) * 2;
-    const title =
-      jump.stuntTitle ||
-      stage.title + (jump.calloutTier === 3 ? "!!" : "!");
-    const subtitle =
-      jump.stuntSubtitle ||
-      (jump.calloutReward
-        ? `+${jump.calloutReward} 金币`
-        : `${jump.duration.toFixed(2)}s IN AIR`);
-
+    const title = jump.stuntTitle || stage.title;
+    const subtitle = jump.stuntSubtitle || (jump.calloutReward
+      ? `+${jump.calloutReward} 金币` : `${jump.duration.toFixed(2)}s / AIR TIME`);
+    const size = Math.max(16, Math.min(25, view.scale * 0.68));
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = `900 ${Math.max(24, Math.min(44, view.scale * 1.45))}px "Noto Sans SC",sans-serif`;
-    ctx.lineJoin = "round";
-    ctx.lineWidth = Math.max(4, view.scale * 0.14);
-    ctx.strokeStyle = "rgba(7,21,17,.92)";
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 14 + jump.calloutTier * 7;
-    ctx.strokeText(title, x, y);
-    ctx.fillStyle = color;
-    ctx.fillText(title, x, y);
-    ctx.shadowBlur = 0;
-    ctx.font = `500 ${Math.max(10, Math.min(15, view.scale * 0.44))}px "IBM Plex Mono",monospace`;
-    ctx.fillStyle = "#fff0bd";
-    ctx.fillText(subtitle, x, y + Math.max(18, view.scale * 0.7));
+    ctx.globalAlpha = Math.min(1, jump.calloutTime * 4);
+    ctx.font = `700 ${size}px "Noto Sans SC",sans-serif`;
+    const titleWidth = ctx.measureText(title).width;
+    ctx.font = '500 10px "IBM Plex Mono",monospace';
+    const boxW = Math.max(120, titleWidth + 34, ctx.measureText(subtitle).width + 34);
+    const boxH = size + 34;
+    const x = clamp(this.toScreenX(rc, car.x) - boxW / 2, 14, Math.max(14, W - boxW - 14));
+    const y = clamp(this.toScreenY(rc, car.y) - boxH - 44, 140, Math.max(140, H - boxH - 110));
+    roundRect(ctx, x, y, boxW, boxH, 7);
+    ctx.fillStyle = "rgba(8,32,36,.85)"; ctx.fill();
+    ctx.strokeStyle = withAlpha(jump.flashColor, 0.35); ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = jump.flashColor; ctx.fillRect(x + 1, y + 11, 2, boxH - 22);
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.font = `700 ${size}px "Noto Sans SC",sans-serif`;
+    ctx.fillStyle = "#f6ebd2"; ctx.fillText(title, x + boxW / 2, y + 8);
+    ctx.font = '500 10px "IBM Plex Mono",monospace';
+    ctx.fillStyle = jump.flashColor; ctx.fillText(subtitle, x + boxW / 2, y + size + 15);
     ctx.restore();
   }
 

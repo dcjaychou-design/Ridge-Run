@@ -1,5 +1,5 @@
 import type { RenderContext } from "../types";
-import { hash, TAU, withAlpha } from "../utils";
+import { clamp, hash, TAU, withAlpha } from "../utils";
 
 /** Floating sun motes and a faint generated film grain. */
 export class AtmosphereRenderer {
@@ -43,6 +43,28 @@ export class AtmosphereRenderer {
       default:
         this.drawSunMotes(rc);
     }
+  }
+
+  /** Peripheral streaks leave the car and the next landing area readable. */
+  drawMotion(rc: RenderContext, speed: number, nitro: boolean): void {
+    const amount = clamp((Math.abs(speed) - 17) / 24, 0, 1);
+    if (amount <= 0) return;
+    const { ctx, width: W, height: H, time } = rc;
+    ctx.save();
+    ctx.lineWidth = nitro ? 1.3 : 0.8;
+    ctx.strokeStyle = nitro ? "#c4f4e9" : rc.palette.rimSoft;
+    for (let i = 0; i < 16; i++) {
+      const q = hash(i * 13.7);
+      const cycle = (time * (0.5 + q) + q * 5) % 1;
+      const side = i % 2 ? 1 : -1;
+      const x = W * 0.5 + side * W * (0.3 + cycle * 0.26);
+      const y = H * (0.23 + hash(i * 7.3) * 0.55);
+      ctx.globalAlpha = Math.sin(cycle * Math.PI) * amount * (nitro ? 0.26 : 0.1);
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.lineTo(x + side * (20 + q * 70) * amount, y + (y - H * 0.55) * 0.025);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private drawSunMotes(rc: RenderContext): void {

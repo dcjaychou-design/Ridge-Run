@@ -2,9 +2,12 @@ import { STAGE_LENGTH, START_X, VEHICLES } from "../constants";
 import { seedHex } from "../daily";
 import { biomePaletteAt, stageInfoAt } from "../physics/biomes";
 import { heightAt, slopeAt } from "../physics/terrain";
+import { SkyRenderer } from "../render/SkyRenderer";
+import { MountainRenderer } from "../render/MountainRenderer";
+import { pine } from "../render/scenery";
 import { VehicleRenderer } from "../render/VehicleRenderer";
 import type { BiomePalette, RunMode, StageInfo, VehicleId } from "../types";
-import { clamp, hash, roundRect, TAU, withAlpha } from "../utils";
+import { clamp, hash, mixHex, roundRect, TAU, withAlpha } from "../utils";
 import { byId } from "./dom";
 
 const POSTER_WIDTH = 1200;
@@ -217,6 +220,8 @@ function digestCode(code: string): string {
 export class PosterGenerator {
   private readonly canvas = byId<HTMLCanvasElement>("posterCanvas");
   private readonly renderer = new VehicleRenderer();
+  private readonly sky = new SkyRenderer();
+  private readonly mountains = new MountainRenderer();
   private currentCode = "";
 
   get code(): string {
@@ -262,8 +267,10 @@ export class PosterGenerator {
 
     ctx.save();
     ctx.clearRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
-    this.drawSky(ctx, palette);
-    this.drawMountains(ctx, palette);
+    const rc = { ctx, width: POSTER_WIDTH, height: POSTER_HEIGHT,
+      view: { x: finalX, y: 0, scale: 30 }, time: 18, stage, palette };
+    this.sky.draw(rc);
+    this.mountains.draw(rc, finalX);
     this.drawForeground(ctx, palette, finalX, groundY);
     this.drawDataScrim(ctx);
     this.drawVehicle(ctx, data, finalX, groundY);
@@ -274,166 +281,6 @@ export class PosterGenerator {
     this.drawFooter(ctx, data);
     this.drawFilm(ctx);
     ctx.restore();
-  }
-
-  private drawSky(ctx: CanvasRenderingContext2D, p: BiomePalette): void {
-    const sky = ctx.createLinearGradient(0, 0, 0, 540);
-    sky.addColorStop(0, p.skyTop);
-    sky.addColorStop(0.24, p.skyUpper);
-    sky.addColorStop(0.48, p.skyMid);
-    sky.addColorStop(0.68, p.skyLow);
-    sky.addColorStop(0.82, p.skyHorizon);
-    sky.addColorStop(1, p.skyBottom);
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
-
-    // stars
-    if (p.starAlpha > 0.12) {
-      for (let i = 0; i < 110; i++) {
-        const x = hash(i * 3.7 + 11) * POSTER_WIDTH;
-        const y = hash(i * 9.1 + 3) * 330;
-        const size = 0.7 + hash(i * 1.3) * 1.5;
-        ctx.fillStyle = withAlpha(
-          PAPER,
-          p.starAlpha * (0.22 + hash(i * 5.7) * 0.65),
-        );
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, TAU);
-        ctx.fill();
-      }
-    }
-
-    // aurora ribbons
-    if (p.aurora > 0.08) {
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      for (let band = 0; band < 3; band++) {
-        const grad = ctx.createLinearGradient(0, 90, 1100, 350);
-        grad.addColorStop(0, withAlpha(ICE, 0));
-        grad.addColorStop(0.35, withAlpha(ICE, 0.16 * p.aurora));
-        grad.addColorStop(0.7, withAlpha("#9fe8da", 0.1 * p.aurora));
-        grad.addColorStop(1, withAlpha(ICE, 0));
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 34 - band * 9;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(-60, 250 + band * 22);
-        ctx.bezierCurveTo(
-          290,
-          55 + band * 34,
-          700,
-          315 - band * 32,
-          1260,
-          110 + band * 46,
-        );
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    // sun / moon glow
-    const sunX = 928;
-    const sunY = 152;
-    const sunRadius = 62;
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const glow = ctx.createRadialGradient(
-      sunX,
-      sunY,
-      0,
-      sunX,
-      sunY,
-      280,
-    );
-    glow.addColorStop(0, withAlpha(p.sunGlow, 0.42 * p.sunAlpha));
-    glow.addColorStop(0.32, withAlpha(p.sunGlow, 0.14 * p.sunAlpha));
-    glow.addColorStop(1, withAlpha(p.sunGlow, 0));
-    ctx.fillStyle = glow;
-    ctx.fillRect(sunX - 300, sunY - 300, 600, 600);
-    const core = ctx.createRadialGradient(
-      sunX - 12,
-      sunY - 14,
-      2,
-      sunX,
-      sunY,
-      sunRadius,
-    );
-    core.addColorStop(0, withAlpha(p.sunCore, 0.95 * p.sunAlpha));
-    core.addColorStop(0.72, withAlpha(p.sunGlow, 0.85 * p.sunAlpha));
-    core.addColorStop(1, withAlpha(p.sunEdge, 0.2 * p.sunAlpha));
-    ctx.fillStyle = core;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, sunRadius, 0, TAU);
-    ctx.fill();
-    ctx.restore();
-
-    // low haze band
-    const haze = ctx.createLinearGradient(0, 300, 0, 470);
-    haze.addColorStop(0, withAlpha(p.hazeColor, 0));
-    haze.addColorStop(0.55, withAlpha(p.hazeColor, p.hazeAlpha * 0.8));
-    haze.addColorStop(1, withAlpha(p.hazeColor, 0));
-    ctx.fillStyle = haze;
-    ctx.fillRect(0, 300, POSTER_WIDTH, 170);
-  }
-
-  private drawMountains(
-    ctx: CanvasRenderingContext2D,
-    p: BiomePalette,
-  ): void {
-    this.ridge(ctx, 338, 58, 1.25, 0.8, p.farTop, p.farBottom, p.crestColor);
-    this.ridge(ctx, 404, 46, 1.65, 2.4, p.midTop, p.midBottom, p.crestColor);
-    this.ridge(ctx, 462, 36, 2.05, 4.1, p.nearTop, p.nearBottom, p.crestColor);
-  }
-
-  private ridge(
-    ctx: CanvasRenderingContext2D,
-    baseY: number,
-    amplitude: number,
-    frequency: number,
-    phase: number,
-    top: string,
-    bottom: string,
-    crest: string,
-  ): void {
-    const path = (): void => {
-      ctx.beginPath();
-      ctx.moveTo(0, POSTER_HEIGHT);
-      for (let x = 0; x <= POSTER_WIDTH; x += 8) {
-        const t = x / POSTER_WIDTH;
-        const y =
-          baseY +
-          Math.sin(t * Math.PI * 2 * frequency + phase) * amplitude +
-          Math.sin(t * Math.PI * 2 * frequency * 2.7 + phase * 1.7) *
-            amplitude *
-            0.32;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(POSTER_WIDTH, POSTER_HEIGHT);
-      ctx.closePath();
-    };
-
-    path();
-    const grad = ctx.createLinearGradient(0, baseY - amplitude, 0, 540);
-    grad.addColorStop(0, top);
-    grad.addColorStop(1, bottom);
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    ctx.beginPath();
-    for (let x = 0; x <= POSTER_WIDTH; x += 8) {
-      const t = x / POSTER_WIDTH;
-      const y =
-        baseY +
-        Math.sin(t * Math.PI * 2 * frequency + phase) * amplitude +
-        Math.sin(t * Math.PI * 2 * frequency * 2.7 + phase * 1.7) *
-          amplitude *
-          0.32;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = withAlpha(crest, 0.18);
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
   }
 
   private drawForeground(
@@ -506,14 +353,8 @@ export class PosterGenerator {
         if (px > 630 && px < 1000) continue;
         const py = screenAt(px);
         const height = 15 + hash(i * 8.7) * 22;
-        ctx.fillStyle = withAlpha(p.treeColor, p.treeAlpha * 1.5);
-        ctx.beginPath();
-        ctx.moveTo(px, py - height);
-        ctx.lineTo(px - height * 0.24, py + 2);
-        ctx.lineTo(px + height * 0.24, py + 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillRect(px - 1, py + 1, 2, 5);
+        pine(ctx, px, py + 2, height * 1.7, p.treeColor,
+          mixHex(p.treeColor, p.crestColor, 0.22), i * 8.1, p.snowCap);
       }
     }
   }

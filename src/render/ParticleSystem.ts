@@ -4,7 +4,7 @@ import type {
   RenderContext,
   VehicleConfig,
 } from "../types";
-import { clamp, TAU, withAlpha } from "../utils";
+import { clamp, TAU } from "../utils";
 
 const MAX_PARTICLES = 340;
 const FLAME_COLORS = ["#eafff7", "#a9f2e4", "#f6c66d"] as const;
@@ -14,6 +14,23 @@ export class ParticleSystem {
   private particles: Particle[] = [];
   private overwriteCursor = 0;
   private nozzleBuf = { x: 0, y: 0, dx: 0, dy: 0 };
+  private plumeSprites = new Map<string, HTMLCanvasElement>();
+
+  private plume(color: string): HTMLCanvasElement {
+    let sprite = this.plumeSprites.get(color);
+    if (sprite) return sprite;
+    sprite = document.createElement("canvas");
+    sprite.width = sprite.height = 64;
+    const c = sprite.getContext("2d")!;
+    const g = c.createRadialGradient(27, 24, 2, 32, 32, 31);
+    g.addColorStop(0, color);
+    g.addColorStop(0.25, color);
+    g.addColorStop(1, "transparent");
+    c.fillStyle = g;
+    c.fillRect(0, 0, 64, 64);
+    this.plumeSprites.set(color, sprite);
+    return sprite;
+  }
 
   clear(): void {
     this.particles.length = 0;
@@ -319,16 +336,10 @@ export class ParticleSystem {
         if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
         const k = clamp(p.life / p.maxLife, 0, 1);
         const r = Math.max(1, p.size * scale * (1.2 - k * 0.45));
-        if (p.type === "dust") {
-          ctx.fillStyle = p.color
-            ? withAlpha(p.color, k * 0.4)
-            : `rgba(220,169,106,${k * 0.23})`;
-        } else {
-          ctx.fillStyle = `rgba(223,216,194,${k * 0.12})`;
-        }
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, TAU);
-        ctx.fill();
+        const color = p.color ?? (p.type === "dust" ? "#d3b589" : "#d6e0d5");
+        const size = r * (p.type === "dust" ? 3.4 : 3.8);
+        ctx.globalAlpha = k * (p.type === "dust" ? 0.3 : 0.17);
+        ctx.drawImage(this.plume(color), x - size * 0.6, y - size * 0.5, size * 1.2, size);
       }
 
       // Pass 2: lighter (flame & shockwave)
@@ -354,11 +365,9 @@ export class ParticleSystem {
           ctx.stroke();
         } else {
           const r = Math.max(1, p.size * scale * (1.2 - k * 0.45));
-          ctx.globalAlpha = k * 0.9;
-          ctx.fillStyle = p.color ?? "#a9f2e4";
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, TAU);
-          ctx.fill();
+          ctx.globalAlpha = k * 0.85;
+          const glowSize = r * 5;
+          ctx.drawImage(this.plume(p.color ?? "#a9f2e4"), x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
           ctx.globalAlpha = k * 0.6;
           ctx.fillStyle = "#f4fff9";
           ctx.beginPath();

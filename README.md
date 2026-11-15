@@ -205,6 +205,16 @@ npm run preview   # 本地预览构建结果
 
 推送到 `main` 后，`.github/workflows/deploy.yml` 会自动执行 `npm ci && npm test && npm run build`，并通过 GitHub Pages Actions 发布 `dist/`；仓库本身不需要提交构建产物。
 
+## 画面与质感
+
+山野远征（Alpine Expedition）视觉升级使用 Canvas 2D 程序化绘制，不依赖外部贴图：
+
+- 四层独立视差的山体与森林；雪线、冷暖岩面、晨雾、风沙、飘雪与帘幕极光，雪峰与峡谷台地随赛段混合平滑变化。
+- 岩土分层、嵌入碎石、细颗粒、积雪与草甸路肩；近景松树、野花与随风草叶；轮胎印随时间淡出。
+- 三款车辆共用细化胎纹、合金轮毂与刹车盘；拉力车增加反射玻璃、车漆层次、灯架、车门与涂装细节，轻骑与重卡同步补充金属细节。
+- 柔和接地阴影、尘雾和氮气光晕、边缘速度线，以及重新排版的特技提示；首页、HUD、车库和战报采用一致的冷青与暖金配色。首页使用独立的贴坡展示镜头呈现开阔山景，实际发车位置与赛道物理保持不变。
+- 山景使用四个有界离屏缓存，车身按车型缓存高清图层；车轮独立转动，粒子复用柔光图块，轮胎印最多保留 320 段。测试用截图与基线放在 Git 忽略的 `.artifacts/`。
+
 ## 技术
 
 Vite + TypeScript，严格模式；Canvas 2D 绘制全部场景与三款载具，Web Audio API 合成引擎与音效，无运行时依赖（仅从 Google Fonts 加载字体）。
@@ -222,6 +232,7 @@ src/
 ├── storage.ts               # v2 存档、v1 迁移、坏档备份/只读降级、字段校验与错误通知
 ├── utils.ts                 # 数学工具与有界十六进制色彩缓存
 ├── style.css                # 全局样式、弹窗、公报与响应式布局
+├── polish.css               # 山野远征视觉主题与响应式细节
 ├── audio/AudioController.ts # Web Audio 合成器
 ├── ghost/
 │   └── GhostSystem.ts       # 轨迹录制、长途倍频压缩、RR2(v1–v3) 编解码、防伪校验与回放
@@ -230,10 +241,13 @@ src/
 │   ├── biomes.ts            # 四大生态调色板缓存、预排序冰面/泥地、上升气流
 │   └── VehiclePhysics.ts    # 多轮悬挂刚体求解器（氮气 / 地表抓地 / 自然倒车）
 ├── render/
+│   ├── HomeShowcase.ts      # 首页独立展示镜头与真实坡面驻车
 │   ├── SkyRenderer.ts       # 分赛段天空、极光、星空与渐变缓存
-│   ├── MountainRenderer.ts  # 视差远山（批量树冠绘制与点缓冲复用）
+│   ├── MountainRenderer.ts  # 山体明暗、雪线、四层视差与有界离屏缓存
+│   ├── TrackRenderer.ts     # 有界轮胎印采样、淡出与绘制
+│   ├── scenery.ts           # 世界坐标噪声、分枝松树与岩块绘制
 │   ├── TerrainRenderer.ts   # 地表、冰面/泥地批量结晶折线、赛段门牌、风口
-│   ├── VehicleRenderer.ts   # 三套车体渐变缓存、夜间大灯、幽灵全息与终点旗
+│   ├── VehicleRenderer.ts   # 高清车身图层、金属轮毂、夜间大灯与幽灵
 │   ├── ItemRenderer.ts      # 金币 / 油桶 / 气瓶 / 磁铁
 │   ├── ParticleSystem.ts    # 紧凑数组池与混合状态合批（尾气/氮气/泥点/雪雾）
 │   ├── JumpFxRenderer.ts    # 空翻、落地、磁铁引力圈、视野外雷达
@@ -252,7 +266,8 @@ tests/
 ├── ghost.test.ts            # ghost v1/v2/v3、长途抽稀、坏码与 PNG 战书测试
 ├── daily-missions.test.ts   # UTC 每日种子/结算与悬赏轮换测试
 ├── storage.test.ts          # v1 迁移、cameraWidth 越界修复、备份与读写失败测试
-└── physics-camera.test.ts   # 起跑平坡、刹车/倒车、底盘接地与动态 FOV 测试
+├── physics-camera.test.ts   # 起跑平坡、刹车/倒车、底盘接地与动态 FOV 测试
+└── showcase.test.ts         # 三车展示贴坡、发车位置与视野隔离回归
 ```
 
 ### 存档兼容
