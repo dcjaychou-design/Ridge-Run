@@ -6,6 +6,7 @@ import { roundRect, TAU, withAlpha } from "../utils";
 export class ItemRenderer {
   private sprites = new Map<ItemType, HTMLCanvasElement>();
   private halos = new Map<string, HTMLCanvasElement>();
+  private fontRefreshQueued = false;
 
   draw(rc: RenderContext, items: Item[]): void {
     const { ctx, width: W, view, time } = rc;
@@ -105,8 +106,19 @@ export class ItemRenderer {
       else if (type === "nitro") this.cylinder(c);
       else this.beacon(c);
       this.sprites.set(type, sprite);
+      this.queueFontRefresh();
     }
     ctx.drawImage(sprite, -width * 0.7, -width * 1.1, width * 1.4, width * 2.2);
+  }
+
+  /** A sprite baked before the display font finishes loading would keep the
+   * fallback lettering for the whole session; rebuild once fonts are ready. */
+  private queueFontRefresh(): void {
+    if (this.fontRefreshQueued) return;
+    const fonts = typeof document === "undefined" ? undefined : document.fonts;
+    if (!fonts) return;
+    this.fontRefreshQueued = true;
+    fonts.ready.then(() => { this.sprites.clear(); }).catch(() => {});
   }
 
   private mint(c: CanvasRenderingContext2D): void {

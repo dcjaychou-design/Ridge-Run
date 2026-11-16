@@ -294,3 +294,9 @@ kbd{border-color:rgba(235,231,206,.22);background:linear-gradient(180deg,rgba(66
 .poster-frame{border-radius:6px;border-color:rgba(230,235,215,.22);box-shadow:0 10px 28px rgba(0,12,20,.2)}
 .toast{background:linear-gradient(115deg,rgba(31,56,50,.96),rgba(7,28,33,.96));box-shadow:inset 0 1px rgba(255,238,201,.07),0 8px 24px rgba(0,12,20,.2)}
 :focus-visible{outline-color:#ffe0aa;box-shadow:0 0 0 5px rgba(238,190,126,.1)}
+
+/* The phone garage is full-bleed; the floating-panel shadow would paint an
+   inner glow across the entire screen, so it keeps style.css's flat surface. */
+@media (max-width:760px){
+  .garage-panel{box-shadow:none}
+}

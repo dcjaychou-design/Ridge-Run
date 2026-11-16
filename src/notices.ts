@@ -14,6 +14,38 @@ import type { NoticeEntry } from "./types";
 
 export const NOTICES: NoticeEntry[] = [
   {
+    id: "update-v2.5.0",
+    category: "update",
+    version: "v2.5.0",
+    date: "2026-11-16",
+    title: "「疾速山脊」高清画质与性能优化",
+    summary:
+      "山体与地表重绘并改用缓存渲染，高分屏更清晰、驾驶更少卡顿；同时修复移动端车库和道具标签的细节问题。",
+    pinned: true,
+    items: [
+      {
+        tag: "NEW",
+        tone: "new",
+        text: "高分屏画质：山体、雪线与林带按屏幕像素密度重绘，Retina 屏幕上边缘更清晰。",
+      },
+      {
+        tag: "NEW",
+        tone: "new",
+        text: "地表与道具：冰面贴坡分层、泥地湿润反光，金币与补给品重绘并复用缓存。",
+      },
+      {
+        tag: "TUNE",
+        tone: "tune",
+        text: "驾驶更顺：赛段换色分帧刷新，岩层与极光复用缓存，隐藏面板不再重复排版。",
+      },
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "细节修复：移动端全屏车库的内阴影、道具标签在字体加载前的显示。",
+      },
+    ],
+  },
+  {
     id: "update-v2.4.0",
     category: "update",
     version: "v2.4.0",
@@ -21,7 +53,6 @@ export const NOTICES: NoticeEntry[] = [
     title: "「山野远征」美术与画面质感全面升级",
     summary:
       "重绘山脊天地、地表岩层、三款载具细节与首页展示镜头，在保留原有驾驶手感的同时带来全新冷青暖金视觉体验。",
-    pinned: true,
     items: [
       {
         tag: "NEW",
