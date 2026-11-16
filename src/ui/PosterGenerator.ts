@@ -7,7 +7,7 @@ import { MountainRenderer } from "../render/MountainRenderer";
 import { pine } from "../render/scenery";
 import { VehicleRenderer } from "../render/VehicleRenderer";
 import type { BiomePalette, RunMode, StageInfo, VehicleId } from "../types";
-import { clamp, hash, mixHex, roundRect, TAU, withAlpha } from "../utils";
+import { clamp, hash, mixHex, roundRect, withAlpha } from "../utils";
 import { byId } from "./dom";
 
 const POSTER_WIDTH = 1200;
@@ -397,14 +397,16 @@ export class PosterGenerator {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const halo = ctx.createRadialGradient(x, y - 20, 10, x, y - 20, 300);
+    ctx.save();
+    ctx.translate(x, y - 20);
+    ctx.scale(330, 190);
+    const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
     halo.addColorStop(0, withAlpha(accent, 0.22));
     halo.addColorStop(0.5, withAlpha(accent, 0.07));
     halo.addColorStop(1, withAlpha(accent, 0));
     ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.ellipse(x, y - 10, 330, 190, 0, 0, TAU);
-    ctx.fill();
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
 
     // speed streaks behind the machine
     for (let i = 0; i < 6; i++) {
@@ -424,10 +426,14 @@ export class PosterGenerator {
     ctx.restore();
 
     ctx.save();
-    ctx.fillStyle = "rgba(2,10,8,.48)";
-    ctx.beginPath();
-    ctx.ellipse(x, groundY + 6, 220, 22, 0, 0, TAU);
-    ctx.fill();
+    ctx.translate(x, groundY + 6);
+    ctx.scale(220, 22);
+    const shadow = ctx.createRadialGradient(0, 0, 0.1, 0, 0, 1);
+    shadow.addColorStop(0, "rgba(2,10,8,.48)");
+    shadow.addColorStop(0.5, "rgba(2,10,8,.24)");
+    shadow.addColorStop(1, "rgba(2,10,8,0)");
+    ctx.fillStyle = shadow;
+    ctx.fillRect(-1, -1, 2, 2);
     ctx.restore();
 
     this.renderer.drawHero(ctx, config, x, y, scale, angle, 3.35, 2.4);

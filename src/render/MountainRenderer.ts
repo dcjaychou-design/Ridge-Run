@@ -15,6 +15,14 @@ export class MountainRenderer {
 
   draw(rc: RenderContext, cameraX: number): void {
     const { ctx, width: W, height: H, palette: p } = rc;
+    // Preserve fine branches and snow edges on Retina displays. The four
+    // reusable layers share a 64 MB pixel budget at normal viewport sizes.
+    const logicalWidth = Math.ceil(W + 768);
+    const transform = ctx.getTransform();
+    const rasterScale = Math.max(1, Math.floor(Math.min(
+      2, Math.hypot(transform.a, transform.b),
+      Math.sqrt(4_000_000 / (logicalWidth * H)),
+    ) * 8) / 8);
     if (this.paletteRef !== p) {
       this.paletteRef = p;
       this.paletteKey = [p.farTop, p.farBottom, p.midTop, p.midBottom,
@@ -37,20 +45,21 @@ export class MountainRenderer {
     for (let depth = 0; depth < 4; depth++) {
       const offset = cameraX * [0.55, 1.25, 2.9, 5.6][depth]!;
       const origin = Math.floor(offset / 256) * 256 - 256;
-      const key = `${W}:${H}:${origin}:${this.paletteKey}:${Math.round(p.treeAlpha * 64)}`;
+      const key = `${W}:${H}:${rasterScale}:${origin}:${this.paletteKey}:${Math.round(p.treeAlpha * 64)}`;
       let cache = this.caches[depth];
       if (!cache || cache.key !== key) {
         const canvas = cache?.canvas ?? document.createElement("canvas");
-        canvas.width = Math.ceil(W + 768);
-        canvas.height = H;
+        canvas.width = Math.ceil(logicalWidth * rasterScale);
+        canvas.height = Math.ceil(H * rasterScale);
         const c = canvas.getContext("2d")!;
-        c.translate(-origin, 0);
-        if (depth < 2) this.massif(c, rc, origin, canvas.width, depth);
-        else this.forest(c, rc, origin, canvas.width, depth);
+        const sx = canvas.width / logicalWidth, sy = canvas.height / H;
+        c.setTransform(sx, 0, 0, sy, -origin * sx, 0);
+        if (depth < 2) this.massif(c, rc, origin, logicalWidth, depth);
+        else this.forest(c, rc, origin, logicalWidth, depth);
         cache = { canvas, key, origin };
         this.caches[depth] = cache;
       }
-      ctx.drawImage(cache.canvas, cache.origin - offset, 0);
+      ctx.drawImage(cache.canvas, cache.origin - offset, 0, logicalWidth, H);
       if (depth < 3) {
         const y = H * (0.58 + depth * 0.075);
         ctx.fillStyle = this.mistGradients[depth]!;

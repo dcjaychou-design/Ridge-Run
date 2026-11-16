@@ -1,9 +1,14 @@
 import { STAGE_LENGTH, START_X } from "../constants";
 import { stageInfoAt, visiblePatches, visibleVents } from "../physics/biomes";
-import { heightAt } from "../physics/terrain";
+import { heightAt, slopeAt } from "../physics/terrain";
 import type { RenderContext, SurfacePatch, UpdraftVent } from "../types";
 import { hash, mixHex, TAU, withAlpha } from "../utils";
 import { fbm, pine, stone } from "./scenery";
+
+const ICE_LAYERS = ["rgba(177,235,233,.28)", "rgba(177,235,233,.16)",
+  "rgba(177,235,233,.1)", "rgba(177,235,233,.05)", "rgba(177,235,233,.015)"];
+const MUD_LAYERS = ["rgba(84,51,39,.7)", "rgba(84,51,39,.5)",
+  "rgba(84,51,39,.27)", "rgba(84,51,39,.12)", "rgba(84,51,39,.025)"];
 
 interface ScreenPoint {
   x: number;
@@ -94,7 +99,24 @@ export class TerrainRenderer {
     trace(view.scale * 0.37);
     ctx.strokeStyle = withAlpha(p.groundBottom, 0.52); ctx.lineWidth = view.scale * 0.07; ctx.stroke();
     trace(0); ctx.strokeStyle = p.rim; ctx.lineWidth = view.scale * 0.16; ctx.stroke();
-    trace(0); ctx.strokeStyle = withAlpha(p.rimSoft, 0.65); ctx.lineWidth = 1.3; ctx.stroke();
+    // The shoulder catches light according to the real surface normal.
+    // Batch similar normals so this costs three strokes for the whole ridge.
+    for (let band = 0; band < 3; band++) {
+      ctx.beginPath();
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1]!, b = pts[i]!;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const light = (dx * 0.83 + dy * 0.55) / Math.hypot(dx, dy);
+        const group = light < 0.55 ? 0 : light < 0.85 ? 1 : 2;
+        if (group !== band) continue;
+        ctx.moveTo(a.x, a.y + view.scale * 0.06);
+        ctx.lineTo(b.x, b.y + view.scale * 0.06);
+      }
+      ctx.strokeStyle = band === 0 ? withAlpha(p.groundBottom, 0.28) :
+        withAlpha(mixHex(p.rim, p.sunCore, 0.25), band === 1 ? 0.12 : 0.4);
+      ctx.lineWidth = view.scale * 0.13; ctx.stroke();
+    }
+    trace(0); ctx.strokeStyle = withAlpha(p.rimSoft, 0.42); ctx.lineWidth = 1.1; ctx.stroke();
     ctx.restore();
     this.drawHazards(rc);
     this.drawGrass(rc);
@@ -281,7 +303,9 @@ export class TerrainRenderer {
     const patchX = this.patchX;
     const patchY = this.patchY;
     let count = 0;
-    const step = 2.4;
+    // Sample at the same visual density as the ridge. Long straight chords
+    // used to cut through crests and leave ice floating above the road.
+    const step = Math.min(0.35, 5 / rc.view.scale);
     for (let x = patch.start; x < patch.end; x += step) {
       patchX[count] = this.toScreenX(rc, x);
       patchY[count] = this.toScreenY(rc, heightAt(x));
@@ -298,115 +322,117 @@ export class TerrainRenderer {
     const { ctx, view } = rc;
     const count = this.fillPatchPoints(rc, patch);
     if (count < 2) return;
-    const patchX = this.patchX;
-    const patchY = this.patchY;
-    const depth = Math.max(7, 1.3 * view.scale);
+    const s = view.scale;
+    const depth = Math.max(8, 0.8 * s);
 
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(patchX[0]!, patchY[0]!);
-    for (let i = 1; i < count; i++) {
-      ctx.lineTo(patchX[i]!, patchY[i]!);
+    this.patchShape(ctx, count, depth);
+    ctx.fillStyle = "rgba(126,206,220,.12)";
+    ctx.fill();
+    ctx.clip();
+
+    // Translucent layers follow the slope instead of a screen-space gradient.
+    for (let j = 0; j < 5; j++) {
+      this.tracePatch(ctx, count, depth * (j + 0.5) / 5);
+      ctx.strokeStyle = ICE_LAYERS[j]!;
+      ctx.lineWidth = depth / 5 + 1;
+      ctx.stroke();
     }
+
+    // Fractures and submerged facets are anchored to world metres, so they
+    // neither shimmer with camera movement nor multiply when the FOV changes.
+    const first = Math.ceil(patch.start / 0.9);
+    const end = Math.floor(patch.end / 0.9);
+    for (let i = first; i <= end; i++) {
+      const wx = i * 0.9, q = hash(i * 7.31);
+      const x = this.toScreenX(rc, wx), y = this.toScreenY(rc, heightAt(wx));
+      if (x < -s || x > rc.width + s) continue;
+      const d = depth * (0.28 + q * 0.52);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan(slopeAt(wx)));
+      ctx.fillStyle = withAlpha(q > 0.5 ? "#ddfbef" : "#376b80", 0.07 + q * 0.06);
+      ctx.beginPath(); ctx.moveTo(-s * 0.22, 2); ctx.lineTo(s * 0.13, d * 0.42);
+      ctx.lineTo(-s * 0.04, d); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(226,255,250,.42)"; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(-s * 0.18, 2);
+      ctx.lineTo(s * 0.08, d * 0.4); ctx.lineTo(-s * 0.06, d * 0.58);
+      ctx.lineTo(s * 0.13, d); ctx.stroke();
+      ctx.strokeStyle = "rgba(72,124,145,.32)";
+      ctx.beginPath(); ctx.moveTo(s * 0.08, d * 0.4);
+      ctx.lineTo(s * 0.26, d * 0.35); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    ctx.save();
+    this.tracePatch(ctx, count, 0.7);
+    ctx.strokeStyle = "rgba(197,251,244,.38)"; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.strokeStyle = "#b2ebe2"; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.restore();
+  }
+
+  private tracePatch(ctx: CanvasRenderingContext2D, count: number, offset: number): void {
+    ctx.beginPath();
+    ctx.moveTo(this.patchX[0]!, this.patchY[0]! + offset);
+    for (let i = 1; i < count; i++) {
+      ctx.lineTo(this.patchX[i]!, this.patchY[i]! + offset);
+    }
+  }
+
+  private patchShape(ctx: CanvasRenderingContext2D, count: number, depth: number): void {
+    this.tracePatch(ctx, count, 0);
+    const start = this.patchX[0]!, end = this.patchX[count - 1]!;
+    const feather = Math.min(depth * 0.9, (end - start) * 0.25);
     for (let i = count - 1; i >= 0; i--) {
-      ctx.lineTo(patchX[i]!, patchY[i]! + depth);
+      const x = this.patchX[i]!;
+      const t = Math.max(0, Math.min(1, (x - start) / feather, (end - x) / feather));
+      ctx.lineTo(x, this.patchY[i]! + depth * t * t * (3 - 2 * t));
     }
     ctx.closePath();
-    const fill = ctx.createLinearGradient(0, patchY[0]!, 0, patchY[0]! + depth);
-    fill.addColorStop(0, "rgba(137,216,200,.34)");
-    fill.addColorStop(0.5, "rgba(137,216,200,.14)");
-    fill.addColorStop(1, "rgba(137,216,200,.02)");
-    ctx.fillStyle = fill;
-    ctx.fill();
-
-    // crisp top edge
-    ctx.globalCompositeOperation = "lighter";
-    ctx.beginPath();
-    ctx.moveTo(patchX[0]!, patchY[0]!);
-    for (let i = 1; i < count; i++) {
-      ctx.lineTo(patchX[i]!, patchY[i]!);
-    }
-    ctx.strokeStyle = "rgba(137,216,200,.28)";
-    ctx.lineWidth = 5;
-    ctx.stroke();
-    ctx.strokeStyle = "#89d8c8";
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-
-    // crystalline zigzags inside the sheet
-    ctx.strokeStyle = "rgba(226,255,250,.44)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 1; i < count - 1; i += 2) {
-      const x = patchX[i]!;
-      const y = patchY[i]!;
-      const len = 5 + hash(i * 4.7 + patch.start) * 13;
-      ctx.moveTo(x, y + 2);
-      ctx.lineTo(x - len * 0.4, y + depth * 0.5);
-      ctx.lineTo(x + len * 0.3, y + depth * 0.38);
-      ctx.lineTo(x - len * 0.18, y + depth * 0.78);
-    }
-    ctx.stroke();
-    ctx.restore();
   }
 
   private drawMudPatch(rc: RenderContext, patch: SurfacePatch): void {
     const { ctx, view } = rc;
     const count = this.fillPatchPoints(rc, patch);
     if (count < 2) return;
-    const patchX = this.patchX;
-    const patchY = this.patchY;
-    const depth = Math.max(9, 1.6 * view.scale);
+    const s = view.scale;
+    const depth = Math.max(9, 0.9 * s);
 
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(patchX[0]!, patchY[0]!);
-    for (let i = 1; i < count; i++) {
-      ctx.lineTo(patchX[i]!, patchY[i]!);
-    }
-    for (let i = count - 1; i >= 0; i--) {
-      ctx.lineTo(patchX[i]!, patchY[i]! + depth);
-    }
-    ctx.closePath();
-    const fill = ctx.createLinearGradient(0, patchY[0]!, 0, patchY[0]! + depth);
-    fill.addColorStop(0, "rgba(86,49,28,.64)");
-    fill.addColorStop(0.5, "rgba(62,34,19,.42)");
-    fill.addColorStop(1, "rgba(36,19,11,.08)");
-    ctx.fillStyle = fill;
+    this.patchShape(ctx, count, depth);
+    ctx.fillStyle = "rgba(48,30,23,.3)";
     ctx.fill();
+    ctx.clip();
 
-    ctx.beginPath();
-    ctx.moveTo(patchX[0]!, patchY[0]!);
-    for (let i = 1; i < count; i++) {
-      ctx.lineTo(patchX[i]!, patchY[i]!);
+    for (let j = 0; j < 5; j++) {
+      this.tracePatch(ctx, count, depth * (j + 0.5) / 5);
+      ctx.strokeStyle = MUD_LAYERS[j]!;
+      ctx.lineWidth = depth / 5 + 1; ctx.stroke();
     }
-    ctx.strokeStyle = "rgba(126,78,42,.55)";
-    ctx.lineWidth = Math.max(3, view.scale * 0.12);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(202,148,94,.4)";
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(111,70,40,.9)";
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
 
-    // bubbles and slop
-    for (let i = 1; i < count - 1; i += 2) {
-      const r = hash(i * 6.1 + patch.start);
-      const x = patchX[i]! + (r - 0.5) * 8;
-      const y = patchY[i]! + 3 + r * depth * 0.55;
-      ctx.fillStyle = `rgba(28,15,9,${0.22 + r * 0.2})`;
-      ctx.beginPath();
-      ctx.ellipse(x, y, 1.4 + r * 3.4, 0.8 + r * 1.3, 0, 0, TAU);
-      ctx.fill();
-      if (r > 0.58) {
-        ctx.strokeStyle = `rgba(214,164,106,${0.18 + r * 0.16})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(x, y, 1.8 + r * 2.6, Math.PI * 0.15, Math.PI * 1.4);
-        ctx.stroke();
+    const first = Math.ceil(patch.start / 0.7), end = Math.floor(patch.end / 0.7);
+    for (let i = first; i <= end; i++) {
+      const q = hash(i * 6.1), wx = i * 0.7;
+      const x = this.toScreenX(rc, wx), y = this.toScreenY(rc, heightAt(wx));
+      if (x < -s || x > rc.width + s) continue;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan(slopeAt(wx)));
+      // Small reflective wet patches sit in the ruts, under the road edge.
+      const w = s * (0.1 + q * 0.22), d = depth * (0.14 + q * 0.4);
+      ctx.fillStyle = "rgba(20,29,30,.34)";
+      ctx.beginPath(); ctx.ellipse(0, d, w, Math.max(1, w * 0.12), -0.06, 0, TAU); ctx.fill();
+      ctx.strokeStyle = withAlpha(rc.palette.sunCore, 0.13 + q * 0.16);
+      ctx.lineWidth = 0.85;
+      ctx.beginPath(); ctx.moveTo(-w * 0.75, d - 0.8); ctx.lineTo(w * 0.4, d - 0.8); ctx.stroke();
+      if (q > 0.55) {
+        stone(ctx, s * 0.17, depth * 0.64, s * (0.025 + q * 0.035), "#362a24", "#957654", i);
       }
+      ctx.restore();
     }
+    ctx.restore();
+
+    ctx.save();
+    this.tracePatch(ctx, count, 1);
+    ctx.strokeStyle = "rgba(81,46,29,.9)"; ctx.lineWidth = Math.max(3, s * 0.13); ctx.stroke();
+    ctx.strokeStyle = "rgba(207,155,105,.6)"; ctx.lineWidth = 1; ctx.stroke();
     ctx.restore();
   }
 

@@ -153,7 +153,7 @@ export class AtmosphereRenderer {
     const { ctx, width: W, height: H, palette } = rc;
     if (palette.nightFactor > 0.01) {
       const quantNight = Math.round(palette.nightFactor * 256) / 256;
-      const key = `${W}|${H}|${quantNight}`;
+      const key = `${ctx.getTransform().a}|${W}|${H}|${quantNight}`;
       if (!this.vignetteGrad || this.vignetteKey !== key) {
         const vignette = ctx.createRadialGradient(
           W * 0.5,
