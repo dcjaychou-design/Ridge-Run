@@ -1433,7 +1433,8 @@ function render(time: number): void {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.clearRect(0, 0, W, H);
+  // The opaque sky covers every pixel; a separate full-resolution clear is
+  // redundant, especially on high-DPI screens.
 
   makeView(time);
   const stage = stageInfoAt(distance);

@@ -243,7 +243,7 @@ body.is-muted .mute-slash{opacity:1}
 .speed-value{font-family:var(--display);font-size:30px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
 .speed-unit{font-family:var(--mono);font-size:8px;color:var(--paper-dim);letter-spacing:.08em}
 .speed-track{height:2px;margin-top:7px;background:rgba(244,232,210,.14);overflow:hidden}
-.speed-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--amber),var(--signal));transition:width .16s linear}
+.speed-fill{height:100%;width:100%;transform:scaleX(0);transform-origin:left center;background:linear-gradient(90deg,var(--amber),var(--signal));transition:transform .16s linear}
 
 /* ---------- toast ---------- */
 .toast{

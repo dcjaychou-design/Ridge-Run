@@ -12,6 +12,7 @@ export class SkyRenderer {
   private lightShaftsKey = "";
   private lightShaftsGrad: CanvasGradient | null = null;
   private auroraSprites: HTMLCanvasElement[] = [];
+  private auroraCache: { canvas: HTMLCanvasElement; frame: number; width: number; height: number } | null = null;
 
   draw(rc: RenderContext): void {
     const { ctx, width: W, height: H, palette: p } = rc;
@@ -81,6 +82,33 @@ export class SkyRenderer {
         this.auroraSprites.push(sprite);
       }
     }
+    // These broad, soft curtains move less than half a CSS pixel per 50 ms.
+    // Cache their light field rather than submit hundreds of overlapping
+    // screen-blended filaments at the display's full resolution every frame.
+    const frame = Math.floor(t * 20);
+    let cache = this.auroraCache;
+    if (!cache || cache.frame !== frame || cache.width !== W || cache.height !== H) {
+      const canvas = cache?.canvas ?? document.createElement("canvas");
+      const width = Math.ceil(W * 0.5), height = Math.ceil(H * 0.25);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width; canvas.height = height;
+      }
+      const c = canvas.getContext("2d")!;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, width, height);
+      c.setTransform(width / W, 0, 0, height / (H * 0.5), 0, 0);
+      this.paintAurora(c, W, H, frame / 20, intensity);
+      cache = { canvas, frame, width: W, height: H };
+      this.auroraCache = cache;
+    }
+    ctx.save(); ctx.globalCompositeOperation = "screen";
+    ctx.drawImage(cache.canvas, 0, 0, W, H * 0.5);
+    ctx.restore();
+  }
+
+  private paintAurora(
+    ctx: CanvasRenderingContext2D, W: number, H: number, t: number, intensity: number,
+  ): void {
     ctx.save(); ctx.globalCompositeOperation = "screen";
     const columns = Math.ceil(W / 8);
     for (let band = 0; band < 3; band++) {

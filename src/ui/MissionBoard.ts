@@ -29,6 +29,10 @@ export class MissionBoard {
       )
       .join("|");
     for (const target of [this.intro, this.pause, this.result]) {
+      // Hidden screens retain their layout for the fade transition. Replacing
+      // their markup still forces style/layout work during every run.
+      // Opening a screen calls sync(..., true), so its progress stays current.
+      if (!force && target.closest(".is-hidden")) continue;
       if (!force && this.keys.get(target) === key) continue;
       this.keys.set(target, key);
       target.innerHTML =

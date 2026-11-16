@@ -3,7 +3,8 @@ import { stageInfoAt, visiblePatches, visibleVents } from "../physics/biomes";
 import { heightAt, slopeAt } from "../physics/terrain";
 import type { RenderContext, SurfacePatch, UpdraftVent } from "../types";
 import { hash, mixHex, TAU, withAlpha } from "../utils";
-import { fbm, pine, stone } from "./scenery";
+import { pine, stone } from "./scenery";
+import { StrataCache } from "./StrataCache";
 
 const ICE_LAYERS = ["rgba(177,235,233,.28)", "rgba(177,235,233,.16)",
   "rgba(177,235,233,.1)", "rgba(177,235,233,.05)", "rgba(177,235,233,.015)"];
@@ -25,6 +26,7 @@ export class TerrainRenderer {
   private groundGradKey = "";
   private groundGrad: CanvasGradient | null = null;
   private grain: CanvasPattern | null = null;
+  private strata = new StrataCache();
 
   draw(rc: RenderContext): void {
     const { ctx, width: W, height: H, view, palette: p } = rc;
@@ -47,21 +49,25 @@ export class TerrainRenderer {
     ctx.save(); ctx.clip(land);
 
     // Rock strata bend with the terrain but break independently of it.
+    const strata = this.strata.get(pts[0]!.wx, pts[pts.length - 1]!.wx);
+    ctx.save();
+    ctx.translate(W * 0.5 - view.x * view.scale, H * 0.5 - view.y * view.scale);
+    ctx.scale(view.scale, view.scale);
+    const strataLight = withAlpha(p.strataColor, 0.2);
+    const strataDark = withAlpha(p.groundBottom, 0.3);
     for (let layer = 0; layer < 9; layer++) {
-      const depth = (0.38 + layer * 0.78) * view.scale;
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const pt = pts[i]!;
-        const y = pt.y + depth + (fbm(pt.wx * 0.24, layer * 17) - 0.5) * view.scale * 0.85;
-        if (i === 0) ctx.moveTo(pt.x, y); else ctx.lineTo(pt.x, y);
-      }
-      ctx.strokeStyle = layer % 3 === 0 ? withAlpha(p.strataColor, 0.2) : withAlpha(p.groundBottom, 0.3);
-      ctx.lineWidth = view.scale * (layer % 3 === 0 ? 0.07 : 0.12);
-      ctx.stroke();
+      ctx.strokeStyle = layer % 3 === 0 ? strataLight : strataDark;
+      ctx.lineWidth = layer % 3 === 0 ? 0.07 : 0.12;
+      for (const tile of strata) ctx.stroke(tile[layer]!);
     }
+    ctx.restore();
     // Embedded, bevelled rock fragments with stable world coordinates.
     const first = Math.floor(view.x - W / view.scale / 2) - 2;
     const end = Math.ceil(view.x + W / view.scale / 2) + 2;
+    const rockDark = mixHex(p.rockColor, p.groundBottom, 0.3);
+    const rockLight = mixHex(p.rockColor, p.strataColor, 0.18);
+    ctx.strokeStyle = withAlpha(p.groundBottom, 0.25);
+    ctx.lineWidth = 0.7;
     for (let i = first; i <= end; i++) {
       for (let j = 0; j < 5; j++) {
         const q = hash(i * 7.9 + j * 31);
@@ -71,10 +77,7 @@ export class TerrainRenderer {
         const y = this.toScreenY(rc, heightAt(wx)) + (0.5 + j * 1.6 + q) * view.scale;
         if (y > H + 30) continue;
         const r = view.scale * (0.055 + q * 0.16);
-        stone(ctx, x, y, r, mixHex(p.rockColor, p.groundBottom, 0.3),
-          mixHex(p.rockColor, p.strataColor, 0.18), i + j * 91);
-        ctx.strokeStyle = withAlpha(p.groundBottom, 0.25);
-        ctx.lineWidth = 0.7;
+        stone(ctx, x, y, r, rockDark, rockLight, i + j * 91);
         ctx.beginPath(); ctx.moveTo(x, y + 1); ctx.lineTo(x - r * 0.4, y + r * 2.8); ctx.stroke();
       }
     }

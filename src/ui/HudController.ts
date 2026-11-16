@@ -66,12 +66,15 @@ export class HudController {
     best: -1,
     coins: -1,
     fuel: -1,
+    fuelFill: -1,
     speed: -1,
     delta: "",
     low: false,
     stage: "",
     nitro: -1,
     magnet: -1,
+    nitroFill: -1,
+    magnetFill: -1,
     combo: -1,
     fovKey: "",
   };
@@ -124,7 +127,13 @@ export class HudController {
       this.fuelTrack.setAttribute("aria-valuenow", String(pct));
       this.last.fuel = pct;
     }
-    this.fuelFill.style.transform = `scaleX(${ratio})`;
+    // The CSS transition supplies smooth movement between sub-pixel changes;
+    // writing every solver sample needlessly invalidates the whole HUD.
+    const fuelFill = Math.round(ratio * 1000) / 1000;
+    if (force || fuelFill !== this.last.fuelFill) {
+      this.fuelFill.style.transform = `scaleX(${fuelFill})`;
+      this.last.fuelFill = fuelFill;
+    }
     const low = ratio <= 0.2;
     if (force || low !== this.last.low) {
       this.fuelPanel.classList.toggle("is-low", low);
@@ -151,13 +160,21 @@ export class HudController {
     const nitroKey = Math.round(nitro * 10) / 10;
     const magnetKey = Math.round(magnet * 10) / 10;
 
-    this.nitroBuff.hidden = nitro <= 0;
-    this.magnetBuff.hidden = magnet <= 0;
-    this.comboChip.hidden = combo <= 0;
-    this.buffBar.hidden = nitro <= 0 && magnet <= 0 && combo <= 0;
+    this.setHidden(this.nitroBuff, nitro <= 0);
+    this.setHidden(this.magnetBuff, magnet <= 0);
+    this.setHidden(this.comboChip, combo <= 0);
+    this.setHidden(this.buffBar, nitro <= 0 && magnet <= 0 && combo <= 0);
 
-    this.nitroFill.style.transform = `scaleX(${clamp(nitro / MAX_NITRO_TIME, 0, 1)})`;
-    this.magnetFill.style.transform = `scaleX(${clamp(magnet / MAGNET_DURATION, 0, 1)})`;
+    const nitroFill = Math.round(clamp(nitro / MAX_NITRO_TIME, 0, 1) * 1000) / 1000;
+    const magnetFill = Math.round(clamp(magnet / MAGNET_DURATION, 0, 1) * 1000) / 1000;
+    if (force || nitroFill !== this.last.nitroFill) {
+      this.nitroFill.style.transform = `scaleX(${nitroFill})`;
+      this.last.nitroFill = nitroFill;
+    }
+    if (force || magnetFill !== this.last.magnetFill) {
+      this.magnetFill.style.transform = `scaleX(${magnetFill})`;
+      this.last.magnetFill = magnetFill;
+    }
     if (force || nitroKey !== this.last.nitro) {
       this.nitroTime.textContent = `${nitroKey.toFixed(1)}s`;
       this.last.nitro = nitroKey;
@@ -174,7 +191,7 @@ export class HudController {
     const speed = Math.round(Math.abs(snapshot.speed) * 3.6);
     if (force || speed !== this.last.speed) {
       this.speedValue.textContent = String(speed);
-      this.speedFill.style.width = `${clamp(speed / 110, 0, 1) * 100}%`;
+      this.speedFill.style.transform = `scaleX(${clamp(speed / 110, 0, 1)})`;
       this.last.speed = speed;
     }
 
@@ -192,6 +209,10 @@ export class HudController {
         liveCam !== baseCam ? `${baseLabel}（动态 ${liveCam}m）` : baseLabel;
       this.last.fovKey = fovKey;
     }
+  }
+
+  private setHidden(node: HTMLElement, hidden: boolean): void {
+    if (node.hidden !== hidden) node.hidden = hidden;
   }
 
   setModeChip(

@@ -3,7 +3,12 @@ import { clamp, hash, mixHex, withAlpha } from "../utils";
 import { fbm, noise, pine } from "./scenery";
 
 interface Point { x: number; y: number }
-interface SceneryCache { canvas: HTMLCanvasElement; key: string; origin: number }
+interface SceneryCache {
+  canvas: HTMLCanvasElement;
+  key: string;
+  origin: number;
+  paintedAt: number;
+}
 
 /** Sculpted massifs, glacial snowfields and independent forest parallax. */
 export class MountainRenderer {
@@ -12,6 +17,7 @@ export class MountainRenderer {
   private paletteKey = "";
   private mistKey = "";
   private mistGradients: CanvasGradient[] = [];
+  private refreshDepth = 0;
 
   draw(rc: RenderContext, cameraX: number): void {
     const { ctx, width: W, height: H, palette: p } = rc;
@@ -30,7 +36,7 @@ export class MountainRenderer {
         .map(c => c.replace(/[0-9a-f]{2}/gi, v =>
           Math.min(255, Math.round(parseInt(v, 16) / 8) * 8).toString(16).padStart(2, "0"))).join("");
     }
-    const mistKey = `${H}:${p.hazeColor}:${ctx.getTransform().a}`;
+    const mistKey = `${H}:${p.hazeColor}:${transform.a}`;
     if (this.mistKey !== mistKey) {
       this.mistKey = mistKey; this.mistGradients.length = 0;
       for (let depth = 0; depth < 3; depth++) {
@@ -42,21 +48,36 @@ export class MountainRenderer {
         this.mistGradients.push(mist);
       }
     }
+    // A fade changes dozens of colours. Repainting all four large rasters in
+    // the same frame causes visible hitches; colour refreshes take turns.
+    // The spare strip also lets scrolling reuse a raster across cell edges.
+    const refreshDepth = this.refreshDepth;
+    this.refreshDepth = (refreshDepth + 1) % 4;
+    const pixelWidth = Math.ceil(logicalWidth * rasterScale);
+    const pixelHeight = Math.ceil(H * rasterScale);
     for (let depth = 0; depth < 4; depth++) {
       const offset = cameraX * [0.55, 1.25, 2.9, 5.6][depth]!;
-      const origin = Math.floor(offset / 256) * 256 - 256;
-      const key = `${W}:${H}:${rasterScale}:${origin}:${this.paletteKey}:${Math.round(p.treeAlpha * 64)}`;
       let cache = this.caches[depth];
-      if (!cache || cache.key !== key) {
+      const key = `${W}:${H}:${rasterScale}:${this.paletteKey}:${Math.round(p.treeAlpha * 64)}`;
+      const resized = !cache || cache.canvas.width !== pixelWidth || cache.canvas.height !== pixelHeight;
+      const uncovered = !cache || offset < cache.origin || offset + W > cache.origin + logicalWidth;
+      const colourRefresh = depth === refreshDepth && cache?.key !== key &&
+        (rc.time - (cache?.paintedAt ?? 0) >= 0.12 || rc.time < (cache?.paintedAt ?? 0));
+      // Missing pixels and changed dimensions are urgent; never postpone them.
+      if (!cache || resized || uncovered || colourRefresh) {
+        const origin = uncovered || resized ? Math.floor(offset / 256) * 256 - 256 : cache.origin;
         const canvas = cache?.canvas ?? document.createElement("canvas");
-        canvas.width = Math.ceil(logicalWidth * rasterScale);
-        canvas.height = Math.ceil(H * rasterScale);
+        if (resized) { canvas.width = pixelWidth; canvas.height = pixelHeight; }
         const c = canvas.getContext("2d")!;
+        // Resizing an unchanged canvas discards its GPU allocation as well as
+        // the bitmap. Clear and reuse it for palette and scrolling updates.
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.clearRect(0, 0, canvas.width, canvas.height);
         const sx = canvas.width / logicalWidth, sy = canvas.height / H;
         c.setTransform(sx, 0, 0, sy, -origin * sx, 0);
         if (depth < 2) this.massif(c, rc, origin, logicalWidth, depth);
         else this.forest(c, rc, origin, logicalWidth, depth);
-        cache = { canvas, key, origin };
+        cache = { canvas, key, origin, paintedAt: rc.time };
         this.caches[depth] = cache;
       }
       ctx.drawImage(cache.canvas, cache.origin - offset, 0, logicalWidth, H);
