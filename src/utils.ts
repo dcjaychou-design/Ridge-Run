@@ -94,3 +94,11 @@ export const mixHex = (a: string, b: string, t: number): string => {
   const bl = Math.round(ab + (bb - ab) * t);
   return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
 };
+
+/** Rounds each RGB hex channel so cached offscreen rasters skip tiny fade steps. */
+export const quantizeHex = (hex: string, step = 8): string =>
+  hex.replace(/[0-9a-f]{2}/gi, (v) =>
+    Math.min(255, Math.round(parseInt(v, 16) / step) * step)
+      .toString(16)
+      .padStart(2, "0"),
+  );

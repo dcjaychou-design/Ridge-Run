@@ -66,6 +66,7 @@ const ALPINE: BiomePalette = {
   detailColor: "#e6b570",
   rockColor: "#435b4a",
   detailStyle: "pine",
+  detailMix: { pine: 1, snow: 0, rock: 0, aurora: 0 },
   atmosphere: "mote",
   nightFactor: 0,
 };
@@ -109,6 +110,7 @@ const GLACIER: BiomePalette = {
   detailColor: "#eafcff",
   rockColor: "#5c818a",
   detailStyle: "snow",
+  detailMix: { pine: 0, snow: 1, rock: 0, aurora: 0 },
   atmosphere: "snow",
   nightFactor: 0,
 };
@@ -152,6 +154,7 @@ const CANYON: BiomePalette = {
   detailColor: "#e8b06f",
   rockColor: "#5d2a1f",
   detailStyle: "rock",
+  detailMix: { pine: 0, snow: 0, rock: 1, aurora: 0 },
   atmosphere: "sand",
   nightFactor: 0,
 };
@@ -195,6 +198,7 @@ const SUMMIT: BiomePalette = {
   detailColor: "#a7e8da",
   rockColor: "#0b2224",
   detailStyle: "aurora",
+  detailMix: { pine: 0, snow: 0, rock: 0, aurora: 1 },
   atmosphere: "night",
   nightFactor: 1,
 };
@@ -279,6 +283,12 @@ export function blendPalettes(
     detailColor: mixHex(a.detailColor, b.detailColor, t),
     rockColor: mixHex(a.rockColor, b.rockColor, t),
     detailStyle: t < 0.5 ? a.detailStyle : b.detailStyle,
+    detailMix: {
+      pine: lerp(a.detailMix.pine, b.detailMix.pine, t),
+      snow: lerp(a.detailMix.snow, b.detailMix.snow, t),
+      rock: lerp(a.detailMix.rock, b.detailMix.rock, t),
+      aurora: lerp(a.detailMix.aurora, b.detailMix.aurora, t),
+    },
     atmosphere: t < 0.5 ? a.atmosphere : b.atmosphere,
     nightFactor: lerp(a.nightFactor, b.nightFactor, t),
   };

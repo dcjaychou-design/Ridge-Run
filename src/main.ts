@@ -90,7 +90,7 @@ import { ParticleSystem } from "./render/ParticleSystem";
 import { SkyRenderer } from "./render/SkyRenderer";
 import { TerrainRenderer } from "./render/TerrainRenderer";
 import { TrackRenderer } from "./render/TrackRenderer";
-import { VehicleRenderer } from "./render/VehicleRenderer";
+import { VehicleRenderer, type GhostScreenPos } from "./render/VehicleRenderer";
 import {
   flushSave,
   getSaveReport,
@@ -124,7 +124,7 @@ import { GarageModal } from "./ui/GarageModal";
 import { HudController } from "./ui/HudController";
 import { MissionBoard } from "./ui/MissionBoard";
 import { NoticeModal } from "./ui/NoticeModal";
-import { Overlays } from "./ui/Overlays";
+import { Overlays, onOverlayStackChange } from "./ui/Overlays";
 import { byId } from "./ui/dom";
 import { clamp, lerp, TAU } from "./utils";
 
@@ -141,8 +141,16 @@ let baseScale = 30;
 let accumulator = 0;
 let lastFrame = 0;
 let elapsed = 0;
+let sceneTime = 0;
+let overSettleTimer = 0;
+let sceneDirty = true;
+let rafId = 0;
 let shake = 0;
 let state: GameState = "intro";
+const reducedMotionQuery =
+  typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-reduced-motion: reduce)")
+    : null;
 
 const camera: CameraState = { x: START_X, y: 0, scale: 30 };
 const view: ViewState = { x: START_X, y: 0, scale: 30 };
@@ -341,7 +349,8 @@ function resize(): void {
   canvas.style.width = `${W}px`;
   canvas.style.height = `${H}px`;
   baseScale = computeBaseScale(W, save.cameraWidth);
-  if (state === "intro") camera.scale = baseScale;
+  if (state !== "playing") camera.scale = targetCamera().scale;
+  sceneDirty = true;
 }
 
 function setCameraWidth(
@@ -357,6 +366,7 @@ function setCameraWidth(
   }
   hud.setCameraWidth(clamped, effectiveCameraWidth(W, camera.scale, clamped));
   persistSave(save);
+  requestSceneRefresh();
   if (options.sound && changed) {
     audio.ensure();
     audio.select();
@@ -943,9 +953,11 @@ function startRun(mode: RunMode = runMode): void {
   overlays.hideNotice();
   resetRun();
   restartArmedAt = 0;
+  overSettleTimer = 0;
   state = "playing";
   clearPressed();
   accumulator = 0;
+  requestSceneRefresh();
   hud.setMode("playing");
   hud.setModeChip(runConfig.modeLabel, mode);
   hud.update(snapshot(), true);
@@ -982,6 +994,7 @@ function pauseGame(): void {
   restartArmedAt = 0;
   state = "paused";
   clearPressed();
+  audio.updateEngine(false, false, 0, false);
   hud.hideToast();
   hud.update(snapshot(), true);
   hud.setMode("paused");
@@ -991,6 +1004,7 @@ function pauseGame(): void {
     coins: runCoins,
     fuelPercent: Math.ceil((fuel / stats.fuelCapacity) * 100),
   });
+  requestSceneRefresh();
 }
 
 function resumeGame(): void {
@@ -1000,6 +1014,7 @@ function resumeGame(): void {
   hud.setMode("playing");
   accumulator = 0;
   audio.ensure();
+  requestSceneRefresh();
 }
 
 function endRun(reason: RunEndReason): void {
@@ -1104,8 +1119,10 @@ function endRun(reason: RunEndReason): void {
   persistSave(save, true);
 
   restartArmedAt = 0;
+  overSettleTimer = 1.25;
   state = "over";
   clearPressed();
+  audio.updateEngine(false, false, 0, false);
   hud.setMode("over");
   hud.updateMeta(save.best, save.coins);
   hud.update(snapshot(), true);
@@ -1127,11 +1144,13 @@ function endRun(reason: RunEndReason): void {
   hud.hideToast();
   overlays.showResult(result);
   missionBoard.sync(save.missions, true);
+  requestSceneRefresh();
 }
 
 function goHome(): void {
   if (garage.isOpen) garage.close();
   restartArmedAt = 0;
+  overSettleTimer = 0;
   state = "intro";
   runMode = "standard";
   if (refreshDaily(save) && !getSaveReport().preserveRawPrimary) {
@@ -1154,6 +1173,7 @@ function goHome(): void {
   resetRun();
   snapCamera();
   missionBoard.sync(save.missions, true);
+  requestSceneRefresh();
 }
 
 function respawn(auto: boolean): void {
@@ -1280,6 +1300,7 @@ function updateMissions(dt: number): void {
 /* ---------- fixed-step simulation ---------- */
 function simulate(dt: number): void {
   elapsed += dt;
+  sceneTime += dt;
   runTime += dt;
   jump.flash = Math.max(0, jump.flash - dt);
   jump.landing = Math.max(0, jump.landing - dt);
@@ -1521,7 +1542,7 @@ function render(time: number): void {
     itemRenderer.draw(rc, items);
   }
 
-  let ghostScreenX: number | null = null;
+  let ghostScreen: GhostScreenPos | null = null;
   if (state !== "intro" && activeGhost && ghostPlayback && ghostPose) {
     vehicleRenderer.drawGhostMarker(
       rc,
@@ -1529,7 +1550,7 @@ function render(time: number): void {
       activeGhost.kind,
       activeGhost.record.distance,
     );
-    ghostScreenX = vehicleRenderer.drawGhost(
+    ghostScreen = vehicleRenderer.drawGhost(
       rc,
       VEHICLES[activeGhost.record.vehicleId],
       ghostPose,
@@ -1540,24 +1561,29 @@ function render(time: number): void {
   }
 
   particles.draw(rc, false);
-  jumpFxRenderer.drawAura(rc, renderCar, jump);
-  jumpFxRenderer.drawMagnetAura(rc, renderCar, jump);
+  if (state === "playing" || state === "paused") {
+    jumpFxRenderer.drawAura(rc, renderCar, jump);
+    jumpFxRenderer.drawMagnetAura(rc, renderCar, jump);
+  }
   vehicleRenderer.draw(rc, displayedCar, physics.vehicle);
   particles.draw(rc, true);
   atmosphereRenderer.drawMotes(rc);
   if (state === "playing") atmosphereRenderer.drawMotion(rc, renderCar.vx, jump.nitroTime > 0);
-  jumpFxRenderer.drawFlash(rc, renderCar, jump);
-  jumpFxRenderer.drawCallout(rc, renderCar, jump);
+  if (state === "playing" || state === "paused") {
+    jumpFxRenderer.drawFlash(rc, renderCar, jump);
+    jumpFxRenderer.drawCallout(rc, renderCar, jump);
+  }
   if (
     state === "playing" &&
     activeGhost &&
-    ghostScreenX !== null &&
-    (ghostScreenX < 0 || ghostScreenX > W) &&
+    ghostScreen &&
+    ghostScreen.offscreen &&
     Math.abs(ghostDelta) <= GHOST_RADAR_RANGE
   ) {
     jumpFxRenderer.drawGhostRadar(
       rc,
-      ghostScreenX,
+      ghostScreen.sx,
+      ghostScreen.sy,
       ghostDelta,
       activeGhost.kind,
     );
@@ -1566,12 +1592,52 @@ function render(time: number): void {
 }
 
 /* ---------- frame loop ---------- */
+function hasCoveringOverlay(): boolean {
+  return (
+    garage.isOpen ||
+    overlays.isNoticeOpen() ||
+    !overlays.challenge.classList.contains("is-hidden") ||
+    !overlays.poster.classList.contains("is-hidden")
+  );
+}
+
+function shouldAnimateScene(): boolean {
+  if (document.hidden) return false;
+  if (state === "playing") return true;
+  if (hasCoveringOverlay()) return false;
+  if (state === "paused") return false;
+  if (state === "over") return overSettleTimer > 0;
+  return !(reducedMotionQuery?.matches ?? false);
+}
+
+function shouldContinueLoop(): boolean {
+  if (document.hidden) return false;
+  if (shouldAnimateScene()) return true;
+  return garage.isOpen && !garage.prefersReducedMotion;
+}
+
+function scheduleFrame(): void {
+  if (rafId !== 0 || document.hidden) return;
+  lastFrame = 0;
+  rafId = requestAnimationFrame(frame);
+}
+
+function requestSceneRefresh(): void {
+  sceneDirty = true;
+  scheduleFrame();
+}
+
 function frame(now: number): void {
-  requestAnimationFrame(frame);
+  rafId = 0;
+  if (document.hidden) {
+    audio.updateEngine(false, false, 0, false);
+    return;
+  }
   if (!lastFrame) lastFrame = now;
   const dt = clamp((now - lastFrame) / 1000, 0, 0.05);
   lastFrame = now;
 
+  const animateScene = shouldAnimateScene();
   if (state === "playing") {
     accumulator += dt;
     let steps = 0;
@@ -1582,13 +1648,19 @@ function frame(now: number): void {
     }
     if (steps === 6) accumulator = 0;
     hud.update(snapshot());
-  } else {
+  } else if (animateScene) {
+    sceneTime += dt;
+    if (state === "over") overSettleTimer = Math.max(0, overSettleTimer - dt);
     particles.update(dt);
   }
 
-  syncRenderCar();
-  updateCamera(dt);
-  render(now / 1000);
+  if (animateScene || sceneDirty) {
+    syncRenderCar();
+    if (animateScene) updateCamera(dt);
+    render(sceneTime);
+    sceneDirty = false;
+  }
+
   const engineAlive = state === "playing" && !car.crashed && fuel > 0;
   audio.updateEngine(
     engineAlive,
@@ -1597,6 +1669,12 @@ function frame(now: number): void {
     engineAlive && jump.nitroTime > 0,
   );
   if (garage.isOpen) garage.tick(now / 1000);
+
+  if (shouldContinueLoop()) {
+    rafId = requestAnimationFrame(frame);
+  } else {
+    lastFrame = 0;
+  }
 }
 
 /* ---------- garage / meta ---------- */
@@ -1613,11 +1691,13 @@ const garage = new GarageModal(save, {
       resetRun();
       snapCamera();
       challengeController.updateModeUi();
+      requestSceneRefresh();
     }
   },
   onClose: () => {
     hud.updateMeta(save.best, save.coins);
     hud.update(snapshot(), true);
+    requestSceneRefresh();
   },
 });
 
@@ -1926,7 +2006,12 @@ function boot(): void {
     challengeController.notifyInvalidBootHash();
   }
 
-  requestAnimationFrame(frame);
+  onOverlayStackChange(requestSceneRefresh);
+  reducedMotionQuery?.addEventListener?.("change", requestSceneRefresh);
+  if (typeof document !== "undefined" && document.fonts) {
+    document.fonts.ready.then(requestSceneRefresh).catch(() => {});
+  }
+  requestSceneRefresh();
 }
 
 window.addEventListener("keydown", handleKeyDown, { passive: false });
@@ -1937,8 +2022,20 @@ window.addEventListener("beforeunload", () => flushSave(save));
 window.addEventListener("hashchange", () => challengeController.handleHashChange());
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && state === "playing") pauseGame();
-  else if (!document.hidden && state === "intro") challengeController.updateModeUi();
+  if (document.hidden) {
+    if (rafId !== 0) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    lastFrame = 0;
+    audio.updateEngine(false, false, 0, false);
+    audio.setBackgrounded(true);
+    if (state === "playing") pauseGame();
+    return;
+  }
+  audio.setBackgrounded(false);
+  if (state === "intro") challengeController.updateModeUi();
+  requestSceneRefresh();
 });
 window.addEventListener("focus", () => {
   if (state === "intro") challengeController.updateModeUi();
@@ -2034,7 +2131,8 @@ bindPedal(byId("brakeBtn"), "brake");
 
 function handleResize(): void {
   resize();
-  if (state === "intro") snapCamera();
+  if (state !== "playing") snapCamera();
+  requestSceneRefresh();
 }
 window.addEventListener("resize", handleResize);
 window.visualViewport?.addEventListener("resize", handleResize);

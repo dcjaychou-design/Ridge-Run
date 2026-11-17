@@ -1,6 +1,6 @@
 import { heightAt, slopeAt } from "../physics/terrain";
 import type { CarState, RenderContext } from "../types";
-import { clamp } from "../utils";
+import { clamp, mixHex } from "../utils";
 
 interface TrackMark { x: number; y: number; angle: number; born: number }
 const MAX_MARKS = 320;
@@ -36,7 +36,7 @@ export class TrackRenderer {
   draw(rc: RenderContext): void {
     const { ctx, width: W, height: H, view, palette: p } = rc;
     ctx.save();
-    ctx.strokeStyle = p.detailStyle === "snow" ? "#517e8d" : "#162e29";
+    ctx.strokeStyle = mixHex("#162e29", "#517e8d", p.detailMix.snow);
     ctx.lineWidth = Math.max(1, view.scale * 0.035);
     for (const mark of this.marks) {
       const x = W * 0.5 + (mark.x - view.x) * view.scale;

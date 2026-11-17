@@ -161,15 +161,18 @@ export class JumpFxRenderer {
   drawGhostRadar(
     rc: RenderContext,
     screenX: number,
+    screenY: number,
     delta: number,
     kind: GhostKind,
   ): void {
     const { ctx, width: W, height: H } = rc;
+    const outX = screenX < 0 || screenX > W;
     const left = screenX < 0;
+    const top = screenY < H * 0.5;
     const color = kind === "pb" ? "#89d8c8" : "#f0b15e";
     const label = kind === "pb" ? "PB" : "RIVAL";
     const text = `${label} ${delta >= 0 ? "+" : ""}${Math.round(delta)}m`;
-    const arrow = left ? "◀" : "▶";
+    const arrow = outX ? (left ? "◀" : "▶") : top ? "▲" : "▼";
     const font = '600 11px "IBM Plex Mono", monospace';
     ctx.save();
     ctx.font = font;
@@ -179,8 +182,13 @@ export class JumpFxRenderer {
     const gap = 6;
     const boxW = textWidth + arrowWidth + gap + pad * 2;
     const boxH = 24;
-    const x = left ? 14 : W - boxW - 14;
-    const y = H * 0.46;
+    const maxY = Math.max(92, H - boxH - 110);
+    const x = outX
+      ? left
+        ? 14
+        : Math.max(14, W - boxW - 14)
+      : clamp(screenX - boxW * 0.5, 14, Math.max(14, W - boxW - 14));
+    const y = outX ? clamp(screenY - boxH * 0.5, 92, maxY) : top ? 92 : maxY;
     roundRect(ctx, x, y, boxW, boxH, 12);
     ctx.fillStyle = "rgba(5,15,12,.8)";
     ctx.fill();
@@ -188,10 +196,14 @@ export class JumpFxRenderer {
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.fillStyle = withAlpha(color, 0.55);
-    ctx.fillRect(x + (left ? 0 : boxW - 2), y + 5, 2, boxH - 10);
+    if (outX) {
+      ctx.fillRect(x + (left ? 0 : boxW - 2), y + 5, 2, boxH - 10);
+    } else {
+      ctx.fillRect(x + 6, top ? y : y + boxH - 2, boxW - 12, 2);
+    }
     ctx.textBaseline = "middle";
     ctx.fillStyle = delta >= 0 ? color : "#eb633a";
-    if (left) {
+    if (!outX || left) {
       ctx.textAlign = "left";
       ctx.fillText(arrow, x + pad, y + boxH * 0.5 + 0.5);
       ctx.textAlign = "right";

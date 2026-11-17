@@ -1,5 +1,5 @@
 import type { BiomePalette, RenderContext } from "../types";
-import { hash, TAU, withAlpha } from "../utils";
+import { hash, quantizeHex, TAU, withAlpha } from "../utils";
 
 /** Palette-driven sky: alpine glow, glacier dawn, canyon sunset, night aurora. */
 export class SkyRenderer {
@@ -176,11 +176,18 @@ export class SkyRenderer {
     p: BiomePalette,
   ): void {
     if (p.cloudAlpha < 0.04) return;
-    const key = p.sunCore + p.skyUpper;
+    const key = quantizeHex(p.sunCore);
     if (!this.cloudCache || this.cloudCache.key !== key) {
-      const canvas = this.cloudCache?.canvas ?? document.createElement("canvas");
-      canvas.width = 720; canvas.height = 180;
+      let canvas = this.cloudCache?.canvas;
+      if (!canvas) {
+        canvas = document.createElement("canvas");
+        canvas.width = 720;
+        canvas.height = 180;
+      }
       const c = canvas.getContext("2d")!;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalCompositeOperation = "source-over";
+      c.clearRect(0, 0, 720, 180);
       for (let i = 0; i < 28; i++) {
         const x = 60 + hash(i * 3.3) * 600;
         const y = 82 + Math.sin(i * 2.3) * 18;

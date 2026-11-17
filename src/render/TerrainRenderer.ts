@@ -164,23 +164,29 @@ export class TerrainRenderer {
     const { ctx, width: W, view, palette: p, time } = rc;
     const first = Math.floor((view.x - W / view.scale / 2 - 1) / 0.28);
     const end = Math.ceil((view.x + W / view.scale / 2 + 1) / 0.28);
+    const pebbleWeight = p.detailMix.snow + p.detailMix.rock;
+    const grassWeight = p.detailMix.pine + p.detailMix.aurora;
+    const blossomWeight = p.detailMix.pine;
     ctx.save();
     for (let i = first; i <= end; i++) {
       const q = hash(i * 4.7), wx = i * 0.28;
       const x = this.toScreenX(rc, wx), y = this.toScreenY(rc, heightAt(wx));
-      if (p.detailStyle === "snow" || p.detailStyle === "rock") {
-        if (q > 0.8) stone(ctx, x, y + 2, view.scale * (0.04 + q * 0.07),
+      if (pebbleWeight > 0.02 && q > 0.8) {
+        ctx.globalAlpha = pebbleWeight;
+        stone(ctx, x, y + 2, view.scale * (0.04 + q * 0.07),
           p.rockColor, p.rimSoft, i);
-        continue;
       }
+      if (grassWeight <= 0.02) continue;
       const h = view.scale * (0.04 + q * 0.15);
       const sway = Math.sin(time * 1.7 + wx * 2) * h * 0.18;
+      ctx.globalAlpha = grassWeight;
       ctx.strokeStyle = mixHex(p.groundTop, p.rim, q * 0.75);
       ctx.lineWidth = Math.max(0.65, view.scale * 0.017);
       ctx.beginPath(); ctx.moveTo(x, y + 1);
       ctx.quadraticCurveTo(x - h * 0.3, y - h * 0.7, x + sway, y - h);
       ctx.moveTo(x + 2, y + 1); ctx.lineTo(x + h * 0.4 + sway, y - h * 0.6); ctx.stroke();
-      if (q > 0.94 && p.detailStyle === "pine") {
+      if (q > 0.94 && blossomWeight > 0.02) {
+        ctx.globalAlpha = blossomWeight;
         ctx.fillStyle = i % 2 ? "#f2d99c" : "#d4c8cb";
         ctx.beginPath(); ctx.arc(x + sway, y - h, Math.max(1, view.scale * 0.025), 0, TAU); ctx.fill();
       }
@@ -444,6 +450,7 @@ export class TerrainRenderer {
     const { ctx, width: W, view, palette: p } = rc;
     const worldStart = Math.floor((view.x - W / view.scale / 2 - 4) / 2.6);
     const worldEnd = Math.ceil((view.x + W / view.scale / 2 + 4) / 2.6);
+    const w = p.detailMix;
     ctx.save();
     for (let i = worldStart; i <= worldEnd; i++) {
       const r = hash(i * 7.17);
@@ -452,99 +459,142 @@ export class TerrainRenderer {
       const y = this.toScreenY(rc, heightAt(wx));
       if (x < -20 || x > W + 20) continue;
 
-      if (p.detailStyle === "snow") {
-        if (r > 0.52) {
-          ctx.fillStyle = withAlpha(p.detailColor, 0.32 + r * 0.3);
-          ctx.beginPath();
-          ctx.ellipse(x, y - 1, 2.4 + r * 5.2, 0.9 + r * 1.3, 0, 0, TAU);
-          ctx.fill();
-        } else if (r < 0.12) {
-          ctx.strokeStyle = withAlpha(p.rim, 0.3 + r);
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(x, y - 1);
-          ctx.lineTo(x + 2.4, y - 5 - r * 8);
-          ctx.moveTo(x + 1, y - 2);
-          ctx.lineTo(x - 2, y - 4 - r * 5);
-          ctx.stroke();
-        }
-        continue;
+      if (w.snow > 0.02) {
+        ctx.globalAlpha = w.snow;
+        this.drawSnowDetail(ctx, x, y, r, p.detailColor, p.rim);
       }
-
-      if (p.detailStyle === "rock") {
-        if (r > 0.47) {
-          ctx.strokeStyle = withAlpha(p.detailColor, 0.27 + r * 0.28);
-          ctx.lineWidth = 1.3;
-          const len = 5 + r * 14;
-          ctx.beginPath();
-          ctx.moveTo(x - len * 0.5, y - 1);
-          ctx.lineTo(x + len * 0.5, y - 2);
-          ctx.stroke();
-        } else if (r < 0.14) {
-          ctx.fillStyle = withAlpha(p.rockColor, 0.9);
-          ctx.beginPath();
-          ctx.moveTo(x - 3.4, y + 2);
-          ctx.lineTo(x - 1, y - 4 - r * 12);
-          ctx.lineTo(x + 3.4, y + 2);
-          ctx.closePath();
-          ctx.fill();
-          ctx.fillStyle = withAlpha(p.detailColor, 0.2);
-          ctx.fillRect(x, y - 2, 1.4, 1.4);
-        }
-        continue;
+      if (w.rock > 0.02) {
+        ctx.globalAlpha = w.rock;
+        this.drawRockDetail(ctx, x, y, r, p.detailColor, p.rockColor);
       }
-
-      if (p.detailStyle === "aurora") {
-        if (r > 0.58) {
-          ctx.strokeStyle = withAlpha(p.detailColor, 0.2 + r * 0.32);
-          ctx.lineWidth = 1;
-          const h = 3.5 + r * 7;
-          ctx.beginPath();
-          ctx.moveTo(x, y - 1);
-          ctx.lineTo(x - 1.2, y - h);
-          ctx.moveTo(x + 1, y - 1);
-          ctx.lineTo(x + 2, y - h * 0.7);
-          ctx.stroke();
-        } else if (r < 0.12) {
-          ctx.fillStyle = withAlpha(p.rockColor, 0.9);
-          ctx.beginPath();
-          ctx.moveTo(x - 3.5, y + 2);
-          ctx.lineTo(x - 1, y - 4 - r * 16);
-          ctx.lineTo(x + 3.5, y + 2);
-          ctx.closePath();
-          ctx.fill();
-        }
-        continue;
+      if (w.aurora > 0.02) {
+        ctx.globalAlpha = w.aurora;
+        this.drawAuroraDetail(ctx, x, y, r, p.detailColor, p.rockColor);
       }
-
-      // alpine pines / grass tufts
-      if (r > 0.61) {
-        ctx.strokeStyle = withAlpha(p.detailColor, 0.27 + r * 0.24);
-        ctx.lineWidth = 1;
-        const h = 4 + r * 8;
-        ctx.beginPath();
-        ctx.moveTo(x, y - 1);
-        ctx.lineTo(x - 1.4, y - h);
-        ctx.moveTo(x + 1, y - 1);
-        ctx.lineTo(x + 2.2, y - h * 0.72);
-        if (r > 0.84) {
-          ctx.moveTo(x + 0.3, y - 1);
-          ctx.lineTo(x + 0.8, y - h * 1.24);
-        }
-        ctx.stroke();
-      } else if (r < 0.15) {
-        ctx.fillStyle = withAlpha(p.rockColor, 0.8);
-        ctx.beginPath();
-        ctx.moveTo(x - 3.5, y + 2);
-        ctx.lineTo(x - 1, y - 4 - r * 16);
-        ctx.lineTo(x + 3.5, y + 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = withAlpha(p.detailColor, 0.16);
-        ctx.fillRect(x, y - 2, 1.4, 1.4);
+      if (w.pine > 0.02) {
+        ctx.globalAlpha = w.pine;
+        this.drawPineDetail(ctx, x, y, r, p.detailColor, p.rockColor);
       }
     }
     ctx.restore();
+  }
+
+  private drawSnowDetail(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    detailColor: string,
+    rimColor: string,
+  ): void {
+    if (r > 0.52) {
+      ctx.fillStyle = withAlpha(detailColor, 0.32 + r * 0.3);
+      ctx.beginPath();
+      ctx.ellipse(x, y - 1, 2.4 + r * 5.2, 0.9 + r * 1.3, 0, 0, TAU);
+      ctx.fill();
+    } else if (r < 0.12) {
+      ctx.strokeStyle = withAlpha(rimColor, 0.3 + r);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 1);
+      ctx.lineTo(x + 2.4, y - 5 - r * 8);
+      ctx.moveTo(x + 1, y - 2);
+      ctx.lineTo(x - 2, y - 4 - r * 5);
+      ctx.stroke();
+    }
+  }
+
+  private drawRockDetail(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    detailColor: string,
+    rockColor: string,
+  ): void {
+    if (r > 0.47) {
+      ctx.strokeStyle = withAlpha(detailColor, 0.27 + r * 0.28);
+      ctx.lineWidth = 1.3;
+      const len = 5 + r * 14;
+      ctx.beginPath();
+      ctx.moveTo(x - len * 0.5, y - 1);
+      ctx.lineTo(x + len * 0.5, y - 2);
+      ctx.stroke();
+    } else if (r < 0.14) {
+      ctx.fillStyle = withAlpha(rockColor, 0.9);
+      ctx.beginPath();
+      ctx.moveTo(x - 3.4, y + 2);
+      ctx.lineTo(x - 1, y - 4 - r * 12);
+      ctx.lineTo(x + 3.4, y + 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = withAlpha(detailColor, 0.2);
+      ctx.fillRect(x, y - 2, 1.4, 1.4);
+    }
+  }
+
+  private drawAuroraDetail(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    detailColor: string,
+    rockColor: string,
+  ): void {
+    if (r > 0.58) {
+      ctx.strokeStyle = withAlpha(detailColor, 0.2 + r * 0.32);
+      ctx.lineWidth = 1;
+      const h = 3.5 + r * 7;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 1);
+      ctx.lineTo(x - 1.2, y - h);
+      ctx.moveTo(x + 1, y - 1);
+      ctx.lineTo(x + 2, y - h * 0.7);
+      ctx.stroke();
+    } else if (r < 0.12) {
+      ctx.fillStyle = withAlpha(rockColor, 0.9);
+      ctx.beginPath();
+      ctx.moveTo(x - 3.5, y + 2);
+      ctx.lineTo(x - 1, y - 4 - r * 16);
+      ctx.lineTo(x + 3.5, y + 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  private drawPineDetail(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    detailColor: string,
+    rockColor: string,
+  ): void {
+    if (r > 0.61) {
+      ctx.strokeStyle = withAlpha(detailColor, 0.27 + r * 0.24);
+      ctx.lineWidth = 1;
+      const h = 4 + r * 8;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 1);
+      ctx.lineTo(x - 1.4, y - h);
+      ctx.moveTo(x + 1, y - 1);
+      ctx.lineTo(x + 2.2, y - h * 0.72);
+      if (r > 0.84) {
+        ctx.moveTo(x + 0.3, y - 1);
+        ctx.lineTo(x + 0.8, y - h * 1.24);
+      }
+      ctx.stroke();
+    } else if (r < 0.15) {
+      ctx.fillStyle = withAlpha(rockColor, 0.8);
+      ctx.beginPath();
+      ctx.moveTo(x - 3.5, y + 2);
+      ctx.lineTo(x - 1, y - 4 - r * 16);
+      ctx.lineTo(x + 3.5, y + 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = withAlpha(detailColor, 0.16);
+      ctx.fillRect(x, y - 2, 1.4, 1.4);
+    }
   }
 
   /* ---------- markers / gates ---------- */

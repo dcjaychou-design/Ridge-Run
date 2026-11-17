@@ -15,6 +15,12 @@ import type {
 } from "../types";
 import { clamp, roundRect, TAU, withAlpha } from "../utils";
 
+export interface GhostScreenPos {
+  sx: number;
+  sy: number;
+  offscreen: boolean;
+}
+
 /**
  * Draws the selected machine in the world and the turntable preview in the
  * garage. All three rigs share the same local coordinates as the solver, so
@@ -23,6 +29,7 @@ import { clamp, roundRect, TAU, withAlpha } from "../utils";
 export class VehicleRenderer {
   private spinBuf: number[] = [0, 0, 0];
   private bodySprites = new Map<string, { canvas: HTMLCanvasElement; x: number; y: number; scale: number }>();
+  private fontRefreshQueued = false;
 
   private fillSpins(count: number, spin: number): number[] {
     this.spinBuf.length = count;
@@ -234,7 +241,7 @@ export class VehicleRenderer {
 
   /**
    * Holographic replay car with a tactical nameplate. Returns the ghost's
-   * screen X so the radar indicator can take over once it leaves the view.
+   * screen coordinates and offscreen status so the radar takes over cleanly.
    */
   drawGhost(
     rc: RenderContext,
@@ -243,7 +250,7 @@ export class VehicleRenderer {
     record: GhostRecord,
     kind: GhostKind,
     playerDistance: number,
-  ): number {
+  ): GhostScreenPos {
     const { ctx, width: W, height: H, view, time } = rc;
     const sx = this.toScreenX(rc, pose.x);
     const sy = this.toScreenY(rc, pose.y);
@@ -252,8 +259,17 @@ export class VehicleRenderer {
     const alpha = pose.finished
       ? GHOST_FINISHED_ALPHA * (0.86 + Math.sin(time * 2.3) * 0.14)
       : GHOST_ALPHA;
+    const cullX = Math.max(160, s * config.displayLength * 0.72 + 40);
+    const cullY = Math.max(140, s * config.displayHeight * 1.1 + 40);
+    const offscreen =
+      sx < -s * config.displayLength * 0.35 ||
+      sx > W + s * config.displayLength * 0.35 ||
+      sy < -s * config.displayHeight * 0.55 ||
+      sy > H + s * config.displayHeight * 0.7;
 
-    if (sx < -240 || sx > W + 240 || sy < -240 || sy > H + 240) return sx;
+    if (sx < -cullX || sx > W + cullX || sy < -cullY || sy > H + cullY) {
+      return { sx, sy, offscreen: true };
+    }
 
     const groundY = this.toScreenY(rc, heightAt(pose.x) + 0.04);
     ctx.save();
@@ -357,7 +373,7 @@ export class VehicleRenderer {
     }
     ctx.restore();
 
-    if (sx < 0 || sx > W) return sx;
+    if (offscreen) return { sx, sy, offscreen: true };
 
     const progress = ghostProgress(record, pose);
     const delta = Math.round(playerDistance - progress);
@@ -375,10 +391,11 @@ export class VehicleRenderer {
     const gapWidth = 7;
     const boxHeight = 21;
     const boxWidth = mainWidth + deltaWidth + gapWidth + pad * 2 + 3;
-    const boxX = clamp(sx - boxWidth * 0.5, 8, W - boxWidth - 8);
-    const boxY = Math.max(
-      8,
+    const boxX = clamp(sx - boxWidth * 0.5, 8, Math.max(8, W - boxWidth - 8));
+    const boxY = clamp(
       sy - s * config.displayHeight * 0.95 - 34,
+      8,
+      Math.max(8, H - boxHeight - 8),
     );
     roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 3);
     ctx.fillStyle = "rgba(5,15,12,.8)";
@@ -402,7 +419,7 @@ export class VehicleRenderer {
     );
     ctx.restore();
 
-    return sx;
+    return { sx, sy, offscreen: false };
   }
 
   /** Glowing ghost finish pennant planted at the replay's final distance. */
@@ -502,7 +519,8 @@ export class VehicleRenderer {
     time: number,
   ): void {
     this.drawRunningGear(ctx, config, wheelSpin);
-    this.drawBodySprite(ctx, config, time);
+    this.drawBodySprite(ctx, config);
+    if (config.id === "moto") this.drawMotoAntenna(ctx, time);
     // Near-side wheels occlude bodywork and expose the brake and alloy faces.
     for (let i = 0; i < config.wheelPositions.length; i++) {
       this.drawTire(ctx, config, config.wheelPositions[i]! + (config.id === "truck" ? 0.06 : 0),
@@ -510,9 +528,9 @@ export class VehicleRenderer {
     }
   }
 
-  /** Bodywork is rasterised once at high resolution; only wheels animate.
+  /** Bodywork is rasterised once at high resolution; moving parts draw live.
    * This also keeps local material gradients correct as the chassis rotates. */
-  private drawBodySprite(ctx: CanvasRenderingContext2D, config: VehicleConfig, time: number): void {
+  private drawBodySprite(ctx: CanvasRenderingContext2D, config: VehicleConfig): void {
     let sprite = this.bodySprites.get(config.id);
     if (!sprite) {
       const scale = 160;
@@ -524,14 +542,24 @@ export class VehicleRenderer {
       const c = canvas.getContext("2d")!;
       c.scale(scale, scale); c.translate(-x, -y);
       if (config.id === "rally") this.drawRally(c);
-      else if (config.id === "moto") this.drawMoto(c, time);
+      else if (config.id === "moto") this.drawMoto(c);
       else this.drawTruck(c);
       this.drawMetalDetails(c, config);
       sprite = { canvas, x, y, scale };
       this.bodySprites.set(config.id, sprite);
+      this.queueFontRefresh();
     }
     ctx.drawImage(sprite.canvas, sprite.x, sprite.y,
       sprite.canvas.width / sprite.scale, sprite.canvas.height / sprite.scale);
+  }
+
+  /** Sprites baked before display fonts resolve keep fallback metrics; clear once ready. */
+  private queueFontRefresh(): void {
+    if (this.fontRefreshQueued) return;
+    const fonts = typeof document === "undefined" ? undefined : document.fonts;
+    if (!fonts) return;
+    this.fontRefreshQueued = true;
+    fonts.ready.then(() => { this.bodySprites.clear(); }).catch(() => {});
   }
 
   private drawMetalDetails(ctx: CanvasRenderingContext2D, config: VehicleConfig): void {
@@ -756,7 +784,7 @@ export class VehicleRenderer {
   }
 
   /* ---------- moto / ATV ---------- */
-  private drawMoto(ctx: CanvasRenderingContext2D, time: number): void {
+  private drawMoto(ctx: CanvasRenderingContext2D): void {
     // rear swingarm + front fork
     ctx.save();
     ctx.lineCap = "round";
@@ -934,8 +962,11 @@ export class VehicleRenderer {
     ctx.ellipse(0.78, -0.34, 0.07, 0.05, -0.3, 0, TAU);
     ctx.fill();
     ctx.restore();
+  }
 
-    // speed shiver on the antenna whip
+  private drawMotoAntenna(ctx: CanvasRenderingContext2D, time: number): void {
+    // speed shiver on the antenna whip, drawn live so it never freezes in the body sprite
+    ctx.save();
     ctx.strokeStyle = "rgba(15,27,21,.75)";
     ctx.lineWidth = 0.018;
     ctx.beginPath();
@@ -947,6 +978,7 @@ export class VehicleRenderer {
       -0.86,
     );
     ctx.stroke();
+    ctx.restore();
   }
 
   /* ---------- polar truck ---------- */

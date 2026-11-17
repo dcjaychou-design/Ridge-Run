@@ -14,6 +14,38 @@ import type { NoticeEntry } from "./types";
 
 export const NOTICES: NoticeEntry[] = [
   {
+    id: "update-v2.6.1",
+    category: "update",
+    version: "v2.6.1",
+    date: "2026-11-18",
+    title: "画面过渡丝滑、幽灵雷达补全与省电优化",
+    summary:
+      "平滑赛段交界处的草木岩纹与轮胎印过渡，修复车身号码字体、轻骑天线动态及幽灵雷达边界盲区，并减少暂停、弹窗与切后台时的耗电。",
+    pinned: true,
+    items: [
+      {
+        tag: "TUNE",
+        tone: "tune",
+        text: "赛段无缝渐变：四个生态交界处的草叶、花簇、雪斑、岩纹与轮胎印色改为连续过渡，不再在 500m 分界中点突然切换。",
+      },
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "涂装字体与天线细节：字体加载完成后自动刷新三车涂装编号，山脊轻骑尾部天线恢复实时摆动效果。",
+      },
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "幽灵指示衔接更稳：修复幽灵接近边缘时雷达与车身铭牌重叠的问题，并补全正上方与正下方出屏时的 ▲ / ▼ 雷达指引。",
+      },
+      {
+        tag: "TUNE",
+        tone: "tune",
+        text: "暂停定格与节能减负：暂停时定格场内粒子并熄灭结束界面残留光效；切后台挂起音频、弹窗期间停绘无效背景帧，并在云层渐变时复用离屏缓存降低耗电。",
+      },
+    ],
+  },
+  {
     id: "update-v2.6.0",
     category: "update",
     version: "v2.6.0",
@@ -21,7 +53,6 @@ export const NOTICES: NoticeEntry[] = [
     title: "全端悬赏看板、操控防误触与战书纪录同步",
     summary:
       "手机与笔记本首页现在都能直接查看悬赏任务；优化提示条布局避免遮挡车辆，补充防误触重开、坏链接提醒与常规战书新纪录同步。",
-    pinned: true,
     items: [
       {
         tag: "NEW",

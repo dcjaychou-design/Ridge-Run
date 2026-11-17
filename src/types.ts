@@ -303,6 +303,7 @@ export interface BiomePalette {
   detailColor: string;
   rockColor: string;
   detailStyle: DetailStyle;
+  detailMix: Record<DetailStyle, number>;
   atmosphere: AtmosphereMode;
   nightFactor: number;
 }

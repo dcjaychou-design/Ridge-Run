@@ -88,6 +88,18 @@ export class AudioController {
     this.setMuted(!this.muted);
   }
 
+  /** Suspends hardware synthesis while the tab is hidden to cut idle power. */
+  setBackgrounded(hidden: boolean): void {
+    if (!this.ac) return;
+    if (hidden) {
+      if (this.ac.state === "running") void this.ac.suspend().catch(() => {});
+      return;
+    }
+    if (!this.muted && this.ac.state === "suspended") {
+      void this.ac.resume().catch(() => {});
+    }
+  }
+
   /** Continuous engine note; called every animation frame. */
   updateEngine(
     active: boolean,
@@ -117,7 +129,7 @@ export class AudioController {
         (nitro ? 0.012 : 0);
       this.engineGain.gain.setTargetAtTime(target, t, 0.12);
     } else {
-      this.engineGain.gain.setTargetAtTime(0.0001, t, 0.12);
+      this.engineGain.gain.setTargetAtTime(0, t, 0.08);
     }
   }
 

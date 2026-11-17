@@ -1,5 +1,5 @@
 import type { BiomePalette, RenderContext } from "../types";
-import { clamp, hash, mixHex, withAlpha } from "../utils";
+import { clamp, hash, mixHex, quantizeHex, withAlpha } from "../utils";
 import { fbm, noise, pine } from "./scenery";
 
 interface Point { x: number; y: number }
@@ -33,8 +33,7 @@ export class MountainRenderer {
       this.paletteRef = p;
       this.paletteKey = [p.farTop, p.farBottom, p.midTop, p.midBottom,
         p.nearTop, p.nearBottom, p.crestColor, p.treeColor, p.skyHorizon]
-        .map(c => c.replace(/[0-9a-f]{2}/gi, v =>
-          Math.min(255, Math.round(parseInt(v, 16) / 8) * 8).toString(16).padStart(2, "0"))).join("");
+        .map((c) => quantizeHex(c)).join("");
     }
     const mistKey = `${H}:${p.hazeColor}:${transform.a}`;
     if (this.mistKey !== mistKey) {

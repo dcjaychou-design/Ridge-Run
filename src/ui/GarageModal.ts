@@ -69,6 +69,10 @@ export class GarageModal {
   private previewCssW = 0;
   private previewCssH = 0;
   private previewDpr = 1;
+  private readonly reducedMotionQuery =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : null;
 
   constructor(save: GameSave, callbacks: GarageCallbacks) {
     this.save = save;
@@ -82,6 +86,14 @@ export class GarageModal {
     window.addEventListener("resize", () => {
       this.previewDirty = true;
     });
+    if (typeof document !== "undefined" && document.fonts) {
+      document.fonts.ready
+        .then(() => {
+          this.previewDirty = true;
+          if (this.openFlag) this.drawPreview(this.prefersReducedMotion ? 0 : performance.now() / 1000);
+        })
+        .catch(() => {});
+    }
 
     for (const def of UPGRADES) {
       const row = document.createElement("div");
@@ -134,6 +146,10 @@ export class GarageModal {
     return this.openFlag;
   }
 
+  get prefersReducedMotion(): boolean {
+    return this.reducedMotionQuery?.matches ?? false;
+  }
+
   get currentVehicle(): VehicleConfig {
     return VEHICLES[VEHICLE_ORDER[this.index]!];
   }
@@ -169,6 +185,10 @@ export class GarageModal {
 
   tick(time: number): void {
     if (!this.openFlag) return;
+    if (this.prefersReducedMotion) {
+      if (this.previewDirty) this.drawPreview(0);
+      return;
+    }
     this.drawPreview(time);
   }
 
@@ -230,7 +250,7 @@ export class GarageModal {
     this.renderUpgrades(!unlocked);
     this.renderAction(config, unlocked, selected);
     this.coinValue.textContent = formatCoins(this.save.coins);
-    this.drawPreview(performance.now() / 1000);
+    this.drawPreview(this.prefersReducedMotion ? 0 : performance.now() / 1000);
   }
 
   private renderUpgrades(locked: boolean): void {

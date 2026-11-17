@@ -3,7 +3,17 @@ import { byId } from "./dom";
 
 const openStack: HTMLElement[] = [];
 const previousFocus = new WeakMap<HTMLElement, HTMLElement | null>();
+const stackListeners = new Set<() => void>();
 let trapBound = false;
+
+export function onOverlayStackChange(listener: () => void): () => void {
+  stackListeners.add(listener);
+  return () => stackListeners.delete(listener);
+}
+
+function notifyStackListeners(): void {
+  for (const listener of stackListeners) listener();
+}
 
 function focusables(root: HTMLElement): HTMLElement[] {
   const nodes = root.querySelectorAll<HTMLElement>(
@@ -55,6 +65,7 @@ export function openOverlay(node: HTMLElement, focusTarget?: HTMLElement): void 
   const existing = openStack.indexOf(node);
   if (existing >= 0) openStack.splice(existing, 1);
   openStack.push(node);
+  notifyStackListeners();
   if (focusTarget) {
     window.setTimeout(() => {
       try {
@@ -75,6 +86,7 @@ export function closeOverlay(node: HTMLElement): void {
   node.setAttribute("aria-hidden", "true");
   const index = openStack.indexOf(node);
   if (index >= 0) openStack.splice(index, 1);
+  notifyStackListeners();
 
   const restore = previousFocus.get(node);
   previousFocus.delete(node);
