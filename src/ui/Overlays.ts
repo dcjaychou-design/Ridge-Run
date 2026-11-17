@@ -179,7 +179,10 @@ export class Overlays {
       } else {
         const gap = Math.max(0, result.rivalDistance - result.distance);
         this.overTitle.textContent = "战书未破";
-        this.overCopy.textContent = `距离对手还差 ${gap}m。换一条走线，再向山脊要一次机会。`;
+        this.overCopy.textContent =
+          gap === 0
+            ? `与对手打平（${result.distance}m），再多冲出 1m 即可拿下胜利。`
+            : `距离对手还差 ${gap}m。换一条走线，再向山脊要一次机会。`;
       }
     } else if (result.mode === "daily") {
       this.overTitle.textContent =

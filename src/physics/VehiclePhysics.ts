@@ -5,6 +5,7 @@ import {
   DUAL_PEDAL_DAMPING,
   GRAVITY,
   GROUND_DAMPING,
+  MAX_LINEAR_SPEED,
   NITRO_CRUISE,
   NITRO_MAX_SPEED,
   NITRO_THRUST,
@@ -30,7 +31,13 @@ import { heightAt, slopeAt } from "./terrain";
 
 const SPRING_FORCE_CAP = 62000;
 const BODY_FORCE_CAP = 46000;
-const MAX_LINEAR_SPEED = 45;
+/**
+ * Whole-car coasting drag, shared across contact wheels by `wheelShares`.
+ * Two-wheel rigs keep the exact pre-v2.6 feel (2 × 62 N per wheel); the
+ * six-wheel hauler no longer pays a third wheel's worth of drag.
+ */
+const COAST_DRAG_RATE = 32;
+const COAST_DRAG_CAP = 124;
 const MAX_ANGULAR_SPEED = 13;
 const MIN_X = START_X - 4.5;
 
@@ -98,6 +105,18 @@ export class VehiclePhysics {
     this.placeAt(START_X, 0);
     this.car.maxX = START_X;
     this.bodyGrounded = false;
+  }
+
+  /**
+   * Flag a crash decided outside the solver (e.g. the car has settled on its
+   * tail or side and can no longer recover). Returns false if already crashed.
+   */
+  forceCrash(): boolean {
+    if (this.car.crashed) return false;
+    this.car.crashed = true;
+    this.car.crashTimer = 0;
+    this.car.omega *= 0.55;
+    return true;
   }
 
   /** Drop the car back onto the ridge after a crash / soft-lock. */
@@ -220,7 +239,7 @@ export class VehiclePhysics {
     // holding both pedals, clears the mode so "brake wins" still holds.
     const brakePressed = input.brake && !this.brakeWasHeld;
     this.brakeWasHeld = input.brake;
-    if (!input.brake || input.gasHeld) {
+    if (!input.brake || input.gasHeld || !input.canDrive) {
       this.reverseMode = false;
     } else if (brakePressed && Math.abs(car.vx) < REVERSE_ENGAGE_SPEED) {
       this.reverseMode = true;
@@ -235,6 +254,9 @@ export class VehiclePhysics {
     const sinA = Math.sin(car.angle);
     const wheelCount = config.wheelPositions.length;
     const wheelRadius = config.wheelRadius;
+    // Nitro cruise is still engine thrust, so it needs fuel too.
+    const cruising =
+      !input.throttle && modifiers.nitro && !input.brake && input.canDrive;
 
     for (let i = 0; i < wheelCount; i++) {
       const lx = config.wheelPositions[i]!;
@@ -278,12 +300,13 @@ export class VehiclePhysics {
         if (input.throttle) {
           const boost = modifiers.nitro ? NITRO_THRUST : 1;
           ft += config.engineBase * stats.engineFactor * share * boost;
-        } else if (modifiers.nitro && !input.brake) {
+        } else if (cruising) {
           // Nitro keeps at least 60% cruise thrust even off the throttle.
           ft += config.engineBase * stats.engineFactor * share * NITRO_CRUISE;
         }
         if (input.brake) {
-          if (this.reverseMode) {
+          // Reverse gear is engine-driven: a dry tank leaves only the brakes.
+          if (this.reverseMode && input.canDrive) {
             ft -= config.engineBase * REVERSE_THRUST * share;
           } else if (vt > 0.8) {
             ft -= BRAKE * share;
@@ -301,10 +324,11 @@ export class VehiclePhysics {
         if (surface.rollingResistance > 0 && Math.abs(vt) > 0.05) {
           ft -= Math.sign(vt) * surface.rollingResistance * share;
         }
-        if (!input.throttle) {
+        if (!input.throttle && !cruising) {
           ft -=
             Math.sign(vt) *
-            Math.min(Math.abs(vt) * 16, 62) *
+            Math.min(Math.abs(vt) * COAST_DRAG_RATE, COAST_DRAG_CAP) *
+            share *
             surface.dragMultiplier;
         }
         const traction = fn * 1.45 * stats.gripFactor * surface.grip;

@@ -24,8 +24,10 @@ import {
   LOW_FUEL_RATIO,
   MAGNET_DURATION,
   MAGNET_MAX_TIME,
+  MAX_LINEAR_SPEED,
   MAX_NITRO_TIME,
   NITRO_FLIP_TIME,
+  NITRO_MAX_SPEED,
   NITRO_PERFECT_TIME,
   NITRO_PICKUP_TIME,
   PERFECT_ANGLE,
@@ -34,6 +36,11 @@ import {
   RESPAWN_FUEL_COST,
   STAGE_LENGTH,
   START_X,
+  STUCK_RECOVER_TIME,
+  TIPPED_MAX_SPEED,
+  TIPPED_MAX_SPIN,
+  TIPPED_ROLL,
+  TIPPED_SETTLE_TIME,
   VEHICLES,
   WHEELIE_ANGLE,
   WHEELIE_INTERVAL,
@@ -205,6 +212,7 @@ let emptyTimer = 0;
 let emptyWarned = false;
 let lowFuelWarned = false;
 let stuckTimer = 0;
+let tippedTimer = 0;
 let exhaustTimer = 0;
 let nitroExhaustTimer = 0;
 let hasTouchedGround = false;
@@ -529,8 +537,10 @@ function finishJump(): void {
   const stage = tier ? JUMP_STAGES[(tier - 1) as number]! : null;
   const baseColor = stage ? stage.color : "#f0b15e";
   const duration = jump.duration;
-  const flips = jump.flipsCompleted;
   const airRotation = jump.airRotation;
+  // Re-evaluate flips from the final net rotation at touchdown so unwinding a
+  // spin back upright mid-air does not still pay out an unlanded flip.
+  const flips = Math.floor((Math.abs(airRotation) + FLIP_TOLERANCE) / TAU);
 
   jump.airborne = false;
   jump.landing = tier ? 0.86 : 0.34;
@@ -543,6 +553,7 @@ function finishJump(): void {
 
   let reward = 0;
   let flashColor = baseColor;
+  let perfectLanded = false;
   const details: string[] = [];
   let toastMain = "";
 
@@ -576,15 +587,11 @@ function finishJump(): void {
       jump.stuntTitle = `${direction} ×${flips}`;
       jump.stuntSubtitle = `+${flipReward} 金币 · 氮气 +${NITRO_FLIP_TIME.toFixed(1)}s`;
       details.push(`落地补发氮气 +${NITRO_FLIP_TIME.toFixed(1)}s`);
-      particles.spawnCoinReward(
-        car.x,
-        car.y - 0.7,
-        Math.min(16, flipReward),
-      );
       particles.spawnShockwave(car.x, car.y, "#ffe9a8", 4.8 + flips * 1.4);
     }
 
-    const slopeAngle = Math.atan(slopeAt(car.x));
+    const slope = slopeAt(car.x);
+    const slopeAngle = Math.atan(slope);
     const angleDiff = Math.abs(
       Math.atan2(
         Math.sin(car.angle - slopeAngle),
@@ -593,6 +600,7 @@ function finishJump(): void {
     );
     if (duration >= PERFECT_MIN_AIR) {
       if (angleDiff < PERFECT_ANGLE) {
+        perfectLanded = true;
         jump.perfectCombo = Math.min(
           PERFECT_MAX_COMBO,
           jump.perfectCombo + 1,
@@ -605,7 +613,10 @@ function finishJump(): void {
           MAX_NITRO_TIME,
           jump.nitroTime + NITRO_PERFECT_TIME,
         );
-        car.vx += 1.2;
+        const norm = 1 / Math.sqrt(1 + slope * slope);
+        const speedCap = jump.nitroTime > 0 ? NITRO_MAX_SPEED : MAX_LINEAR_SPEED;
+        car.vx = Math.min(speedCap, car.vx + norm * 1.2);
+        car.vy = clamp(car.vy + slope * norm * 1.2, -speedCap, speedCap);
         toastMain = toastMain
           ? `${toastMain} · 完美落地 ×${jump.perfectCombo}`
           : `完美落地 ×${jump.perfectCombo}`;
@@ -639,12 +650,14 @@ function finishJump(): void {
     flashColor,
     tier === 3 ? 1.3 : tier === 2 ? 1.05 : tier === 1 ? 0.72 : 0.34,
   );
-  particles.spawnShockwave(
-    car.x,
-    heightAt(car.x) - 0.04,
-    flashColor,
-    tier ? 4 + tier * 2.2 : 2.6,
-  );
+  if (!perfectLanded) {
+    particles.spawnShockwave(
+      car.x,
+      heightAt(car.x) - 0.04,
+      flashColor,
+      tier ? 4 + tier * 2.2 : 2.6,
+    );
+  }
   particles.spawnLandingBurst(car.x, heightAt(car.x), tier, flashColor);
   addShake(tier === 3 ? 1.12 : tier === 2 ? 0.78 : tier === 1 ? 0.48 : 0.22);
   audio.landing(tier);
@@ -803,6 +816,7 @@ function resetRun(): void {
   emptyWarned = false;
   lowFuelWarned = false;
   stuckTimer = 0;
+  tippedTimer = 0;
   exhaustTimer = 0;
   nitroExhaustTimer = 0;
   hasTouchedGround = false;
@@ -1122,6 +1136,7 @@ function respawn(auto: boolean): void {
   const targetX = Math.max(START_X + 3, car.maxX - 7);
   physics.teleportTo(targetX);
   stuckTimer = 0;
+  tippedTimer = 0;
   fuel = Math.max(5, fuel - RESPAWN_FUEL_COST);
   jump.airborne = false;
   jump.duration = 0;
@@ -1187,7 +1202,7 @@ function updateGhost(): void {
   if (
     !ghostOvertaken &&
     activeGhost.record.distance >= GHOST_MIN_OVERTAKE &&
-    distance >= activeGhost.record.distance
+    Math.floor(distance) > activeGhost.record.distance
   ) {
     ghostOvertaken = true;
     triggerGhostOvertake();
@@ -1255,7 +1270,7 @@ function simulate(dt: number): void {
   const canDrive = fuel > 0 && !car.crashed;
   const brake = !car.crashed && brakeHeld;
   const throttle = canDrive && gasHeld && !brakeHeld;
-  const nitroActive = jump.nitroTime > 0 && !car.crashed;
+  const nitroActive = canDrive && jump.nitroTime > 0;
 
   if (!car.crashed) {
     const speed = Math.abs(car.vx);
@@ -1285,41 +1300,61 @@ function simulate(dt: number): void {
   }
   ghostRecorder.tick(dt, car.x, car.y, car.angle);
 
+  let respawned = false;
   if (events.grounded && !car.crashed) {
     stuckTimer =
       Math.abs(car.vx) < 0.35 && throttle ? stuckTimer + dt : 0;
-    if (stuckTimer > 4 && fuel > 15) respawn(true);
+    if (stuckTimer > STUCK_RECOVER_TIME && fuel > RESPAWN_FUEL_COST) {
+      respawn(true);
+      respawned = true;
+    } else {
+      const roll = Math.abs(Math.atan2(Math.sin(car.angle), Math.cos(car.angle)));
+      const settledTipped =
+        roll > TIPPED_ROLL &&
+        Math.hypot(car.vx, car.vy) < TIPPED_MAX_SPEED &&
+        Math.abs(car.omega) < TIPPED_MAX_SPIN;
+      tippedTimer = settledTipped ? tippedTimer + dt : 0;
+      if (tippedTimer > TIPPED_SETTLE_TIME && physics.forceCrash()) {
+        events.crashed = true;
+        tippedTimer = 0;
+      }
+    }
   } else {
     stuckTimer = 0;
+    tippedTimer = 0;
   }
 
-  const groundedNow = events.grounded;
-  if (!groundedNow && events.wasWheelGrounded && hasTouchedGround) beginJump();
-  if (!groundedNow && jump.airborne) {
-    jump.duration += dt;
-    jump.airRotation += car.omega * dt;
-    const totalFlips = Math.floor(
-      (Math.abs(jump.airRotation) + FLIP_TOLERANCE) / TAU,
-    );
-    if (totalFlips > jump.flipsCompleted) {
-      jump.flipsCompleted = totalFlips;
-      triggerFlip(totalFlips);
+  if (!respawned) {
+    const groundedNow = events.grounded;
+    if (!jump.airborne && !groundedNow && events.wasGrounded && hasTouchedGround) {
+      beginJump();
     }
-    while (jump.tier < JUMP_STAGES.length) {
-      const stage = JUMP_STAGES[jump.tier as number]!;
-      if (jump.duration + 0.000001 < stage.time) break;
-      triggerJumpTier((jump.tier + 1) as JumpTier);
+    if (!groundedNow && jump.airborne) {
+      jump.duration += dt;
+      jump.airRotation += car.omega * dt;
+      const totalFlips = Math.floor(
+        (Math.abs(jump.airRotation) + FLIP_TOLERANCE) / TAU,
+      );
+      if (totalFlips > jump.flipsCompleted) {
+        jump.flipsCompleted = totalFlips;
+        triggerFlip(totalFlips);
+      }
+      while (jump.tier < JUMP_STAGES.length) {
+        const stage = JUMP_STAGES[jump.tier as number]!;
+        if (jump.duration + 0.000001 < stage.time) break;
+        triggerJumpTier((jump.tier + 1) as JumpTier);
+      }
+    } else if (groundedNow && jump.airborne) {
+      finishJump();
     }
-  } else if (groundedNow && jump.airborne) {
-    finishJump();
+    if (groundedNow && !events.wasGrounded && car.vy > 2.7 && !jump.landing) {
+      addShake(0.55);
+      particles.spawnDust(car.x - 0.75, car.y + 0.45, -1, car.vx);
+      particles.spawnDust(car.x + 0.75, car.y + 0.45, 1, car.vx);
+    }
+    if (events.wheelGrounded) hasTouchedGround = true;
+    updateWheelie(dt);
   }
-  if (groundedNow && !events.wasGrounded && car.vy > 2.7 && !jump.landing) {
-    addShake(0.55);
-    particles.spawnDust(car.x - 0.75, car.y + 0.45, -1, car.vx);
-    particles.spawnDust(car.x + 0.75, car.y + 0.45, 1, car.vx);
-  }
-  if (events.wheelGrounded) hasTouchedGround = true;
-  updateWheelie(dt);
 
   if (events.crashed) {
     addShake(1.05);
@@ -1528,11 +1563,12 @@ function frame(now: number): void {
   syncRenderCar();
   updateCamera(dt);
   render(now / 1000);
+  const engineAlive = state === "playing" && !car.crashed && fuel > 0;
   audio.updateEngine(
-    state === "playing" && !car.crashed,
-    readGas(),
+    engineAlive,
+    engineAlive && readGas(),
     Math.abs(car.vx),
-    state === "playing" && jump.nitroTime > 0 && !car.crashed,
+    engineAlive && jump.nitroTime > 0,
   );
   if (garage.isOpen) garage.tick(now / 1000);
 }

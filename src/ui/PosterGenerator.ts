@@ -212,6 +212,17 @@ function digestCode(code: string): string {
   return code.length <= 20 ? code : `${code.slice(0, 12)}…${code.slice(-4)}`;
 }
 
+const POSTER_TERRAIN_RELIEF = 14;
+
+/** Maps a world ridge height onto poster screen Y (matching Canvas Y-down slope). */
+export function posterTerrainScreenY(
+  groundY: number,
+  height: number,
+  baseHeight: number,
+): number {
+  return groundY + (height - baseHeight) * POSTER_TERRAIN_RELIEF;
+}
+
 /**
  * Renders the Alpine Dusk tactical report card at a fixed 1200 × 630. The
  * canvas is the same element shown in the preview dialog, so downloading
@@ -291,10 +302,8 @@ export class PosterGenerator {
   ): void {
     const baseHeight = heightAt(finalX);
     const worldAt = (px: number): number => finalX + (px - 790) / 30;
-    const screenAt = (px: number): number => {
-      const h = heightAt(worldAt(px));
-      return groundY - (h - baseHeight) * 14;
-    };
+    const screenAt = (px: number): number =>
+      posterTerrainScreenY(groundY, heightAt(worldAt(px)), baseHeight);
 
     const path = (): void => {
       ctx.beginPath();

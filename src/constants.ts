@@ -19,6 +19,7 @@ export const CAMERA_WIDTH_STEP = 2;
 export const CAMERA_WIDTH_PRESETS = [32, 36, 41, 46] as const;
 
 export const GRAVITY = 10.2;
+export const MAX_LINEAR_SPEED = 45;
 export const SPRING = 29000;
 export const DAMPER = 1650;
 export const BRAKE = 2550;
@@ -37,6 +38,16 @@ export const FUEL_PICKUP_AMOUNT = 34;
 export const LOW_FUEL_RATIO = 0.2;
 export const RESPAWN_FUEL_COST = 15;
 export const CRASH_SETTLE_TIME = 1.35;
+/** Grounded + throttle held + no progress for this long triggers auto-recovery. */
+export const STUCK_RECOVER_TIME = 4;
+/**
+ * A car resting this far past vertical (world roll, rad), nearly motionless,
+ * for TIPPED_SETTLE_TIME has settled on its tail / side and cannot recover.
+ */
+export const TIPPED_ROLL = 1.35;
+export const TIPPED_MAX_SPEED = 1.2;
+export const TIPPED_MAX_SPIN = 1;
+export const TIPPED_SETTLE_TIME = 2.2;
 
 /* ---------- persistence ---------- */
 export const SAVE_KEY = "ridge-run-v2";
@@ -133,10 +144,12 @@ export const VEHICLES: Record<VehicleId, VehicleConfig> = {
       { x: 0, y: 0.31 },
       { x: 1.52, y: 0.18 },
     ],
+    // Roof probes sit on the drawn body outline (VehicleRenderer.drawRally):
+    // rear-window/roof corner, roof-rack lamps and the windscreen header.
     roofPoints: [
-      { x: -0.6, y: -0.62 },
-      { x: 0.04, y: -0.58 },
-      { x: 0.54, y: -0.6 },
+      { x: -0.32, y: -0.64 },
+      { x: 0.15, y: -0.8 },
+      { x: 0.58, y: -0.62 },
     ],
     displayLength: 3.7,
     displayHeight: 2.05,
@@ -168,10 +181,11 @@ export const VEHICLES: Record<VehicleId, VehicleConfig> = {
       { x: 0, y: 0.32 },
       { x: 1.02, y: 0.2 },
     ],
+    // Seat tail, rider helmet crown and handlebar end (VehicleRenderer.drawMoto).
     roofPoints: [
-      { x: -0.38, y: -0.58 },
-      { x: 0.34, y: -0.94 },
-      { x: 0.74, y: -0.48 },
+      { x: -0.7, y: -0.38 },
+      { x: 0.36, y: -1.02 },
+      { x: 0.86, y: -0.52 },
     ],
     displayLength: 2.85,
     displayHeight: 2.15,
@@ -203,10 +217,14 @@ export const VEHICLES: Record<VehicleId, VehicleConfig> = {
       { x: -0.1, y: 0.36 },
       { x: 2.12, y: 0.24 },
     ],
+    // Container rear/front top, cab roof and windscreen header
+    // (VehicleRenderer.drawTruck); the old front probe floated 0.29 m above the
+    // sloped windscreen and the container's rear corner was uncovered.
     roofPoints: [
-      { x: -1.55, y: -1.0 },
-      { x: 0.25, y: -1.06 },
-      { x: 1.55, y: -0.98 },
+      { x: -2.1, y: -0.92 },
+      { x: -0.4, y: -0.94 },
+      { x: 0.8, y: -1.0 },
+      { x: 1.5, y: -0.76 },
     ],
     displayLength: 5.1,
     displayHeight: 2.45,

@@ -14,6 +14,38 @@ import type { NoticeEntry } from "./types";
 
 export const NOTICES: NoticeEntry[] = [
   {
+    id: "update-v2.5.1",
+    category: "update",
+    version: "v2.5.1",
+    date: "2026-11-17",
+    title: "驾驶判定、防卡死与战报显示修复",
+    summary:
+      "修复多处影响爬坡体验的物理与判定问题：空中特技与幽灵超越口径更准确，解决大倾角卡死及空油倒车漏洞，并修正战报坡度方向。",
+    pinned: true,
+    items: [
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "跳跃与空翻判定：修复擦底盘后再次腾空漏计跳跃的问题；空翻按落地时实际净旋转圈数结算，完美落地按当地坡面切线给予速度补偿。",
+      },
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "防卡死与碰撞校准：校准三款载具的车顶碰撞轮廓；大倾角卡在坡面不动超过 2.2 秒会自动判翻结算，不再干等余油耗尽。",
+      },
+      {
+        tag: "TUNE",
+        tone: "tune",
+        text: "燃油与滑行手感：空油后熄火不再支持倒车和氮气巡航，踩油门也不再空转轰鸣；极地重卡松油滑行阻力改为按三轴分摊。",
+      },
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "幽灵胜负与战报坡向：局内超越提示与结算胜负统一按整米数比较；修复战术战报 PNG 前景坡度上下反转的问题。",
+      },
+    ],
+  },
+  {
     id: "update-v2.5.0",
     category: "update",
     version: "v2.5.0",
@@ -21,7 +53,6 @@ export const NOTICES: NoticeEntry[] = [
     title: "「疾速山脊」高清画质与性能优化",
     summary:
       "山体与地表重绘并改用缓存渲染，高分屏更清晰、驾驶更少卡顿；同时修复移动端车库和道具标签的细节问题。",
-    pinned: true,
     items: [
       {
         tag: "NEW",
