@@ -45,6 +45,17 @@ function challengeLink(code: string): string {
   return `${base}#challenge=${code}`;
 }
 
+function hasChallengeHash(hash: string): boolean {
+  if (!hash || hash === "#") return false;
+  const raw = hash.replace(/^#/, "");
+  if (raw.startsWith("RR2.")) return true;
+  try {
+    return new URLSearchParams(raw).has("challenge");
+  } catch (_) {
+    return raw.includes("challenge=");
+  }
+}
+
 function fallbackCopy(text: string): boolean {
   const area = document.createElement("textarea");
   area.value = text;
@@ -89,6 +100,8 @@ export class ChallengeController {
   private readonly posterGenerator = new PosterGenerator();
 
   private loaded: GhostRecord | null = challengeFromHash(location.hash);
+  private bootHashInvalid =
+    hasChallengeHash(location.hash) && this.loaded === null;
   private summary: RunSummary | null = null;
   private posterReady = false;
 
@@ -137,6 +150,16 @@ export class ChallengeController {
     }
   }
 
+  notifyInvalidBootHash(): void {
+    if (!this.bootHashInvalid) return;
+    this.bootHashInvalid = false;
+    this.deps.hud.showToast(
+      "战书链接无效",
+      "挑战码损坏或被截断，请重新复制完整链接",
+      "high",
+    );
+  }
+
   handleHashChange(): void {
     if (!location.hash) {
       if (this.loaded) {
@@ -147,13 +170,20 @@ export class ChallengeController {
     }
     const record = challengeFromHash(location.hash);
     if (record) {
+      this.bootHashInvalid = false;
       this.loaded = record;
       this.updateModeUi();
       return;
     }
-    if (location.hash.startsWith("#challenge=")) {
+    if (hasChallengeHash(location.hash)) {
       this.loaded = null;
       this.updateModeUi();
+      this.deps.audio.deny();
+      this.deps.hud.showToast(
+        "战书链接无效",
+        "挑战码损坏或被截断，请重新复制完整链接",
+        "high",
+      );
     }
   }
 

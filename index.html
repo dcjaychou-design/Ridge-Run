@@ -123,7 +123,7 @@
               <path d="M10 19.1a2.1 2.1 0 0 0 4 0"/>
             </svg>
           </span>
-          <span class="notice-btn-copy"><strong>山脊公报</strong><small id="noticeVersion">v2.5.1</small></span>
+          <span class="notice-btn-copy"><strong>山脊公报</strong><small id="noticeVersion">v2.6</small></span>
           <span class="notice-dot" id="noticeDot" hidden></span>
         </button>
         <div class="record is-empty"><span>个人最佳距离</span><strong id="introBest" class="is-empty">尚无</strong><small>M</small></div>
@@ -203,17 +203,21 @@
         <p class="mobile-note">右侧油门 · 左侧刹车 · 腾空时用两只踏板控姿</p>
       </div>
 
-      <aside class="drive-card" aria-label="操作说明">
-        <div class="drive-card-head"><span>驾驶手册</span><span>NO. 01</span></div>
-        <div class="drive-row"><span class="keys"><kbd>A</kbd><kbd>←</kbd></span><span>刹车 / 倒车</span></div>
-        <div class="drive-row"><span class="keys"><kbd>D</kbd><kbd>→</kbd></span><span>油门</span></div>
-        <div class="drive-row"><span class="keys"><kbd>[</kbd><kbd>]</kbd></span><span>镜头拉近 / 拉远</span></div>
-        <div class="drive-row"><span class="keys"><kbd>P</kbd><kbd>M</kbd></span><span>暂停 / 静音</span></div>
-        <div class="drive-row"><span class="keys"><kbd>G</kbd></span><span>整备车库</span></div>
-        <div class="drive-row"><span class="keys"><kbd>N</kbd></span><span>山脊公报</span></div>
-        <p class="drive-note">触屏使用两侧踏板。腾空时，油门抬车头，刹车压车头；收集油桶，别让油表先归零。三款车型与十级改装都在车库里。</p>
+      <aside class="drive-card" aria-label="驾驶手册与悬赏看板">
+        <div class="drive-manual">
+          <div class="drive-card-head"><span>驾驶手册</span><span>NO. 01</span></div>
+          <div class="drive-rows">
+            <div class="drive-row"><span class="keys"><kbd>A</kbd><kbd>←</kbd></span><span>刹车 / 倒车</span></div>
+            <div class="drive-row"><span class="keys"><kbd>D</kbd><kbd>→</kbd></span><span>油门</span></div>
+            <div class="drive-row"><span class="keys"><kbd>[</kbd><kbd>]</kbd></span><span>镜头拉近 / 拉远</span></div>
+            <div class="drive-row"><span class="keys"><kbd>P</kbd><kbd>M</kbd></span><span>暂停 / 静音</span></div>
+            <div class="drive-row"><span class="keys"><kbd>G</kbd></span><span>整备车库</span></div>
+            <div class="drive-row"><span class="keys"><kbd>N</kbd></span><span>山脊公报</span></div>
+          </div>
+          <p class="drive-note">触屏使用两侧踏板。腾空时，油门抬车头，刹车压车头；收集油桶，别让油表先归零。三款车型与十级改装都在车库里。</p>
+        </div>
 
-        <div class="mission-board">
+        <div class="mission-board" aria-label="悬赏看板">
           <div class="mission-board-head"><span>悬赏看板</span><span>PIT CONTRACTS</span></div>
           <div class="mission-list" id="missionBoardList"></div>
           <p class="mission-board-note">单局达成 · 即时结算 · 赛后轮换</p>
@@ -417,6 +421,7 @@
 
         <section class="garage-build" aria-label="性能改装">
           <div class="build-head"><span>性能改装</span><span>Upgrade bench</span></div>
+          <p class="garage-mode-note" id="garageModeNote" role="note" hidden></p>
           <div class="upgrade-list" id="garageUpgradeList"></div>
           <p class="build-note">每项 10 级 · 改装永久保存于本地车库</p>
         </section>

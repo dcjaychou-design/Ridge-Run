@@ -52,6 +52,7 @@ export class GarageModal {
   private readonly specs = byId("garageVehicleSpecs");
   private readonly dots = byId("garageDots");
   private readonly upgradeList = byId("garageUpgradeList");
+  private readonly modeNote = document.getElementById("garageModeNote");
   private readonly coinValue = byId("garageCoins");
   private readonly actionBtn = byId<HTMLButtonElement>("garageActionBtn");
   private readonly preview = byId<HTMLCanvasElement>("garagePreview");
@@ -137,11 +138,15 @@ export class GarageModal {
     return VEHICLES[VEHICLE_ORDER[this.index]!];
   }
 
-  open(): void {
+  open(modeNote?: string): void {
     this.index = Math.max(
       0,
       VEHICLE_ORDER.indexOf(this.save.selectedVehicle),
     );
+    if (this.modeNote) {
+      this.modeNote.textContent = modeNote ?? "";
+      this.modeNote.hidden = !modeNote;
+    }
     this.openFlag = true;
     this.previewDirty = true;
     openOverlay(this.root, this.closeBtn);

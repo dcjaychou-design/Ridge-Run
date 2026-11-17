@@ -115,7 +115,9 @@ kbd{border-radius:3px;box-shadow:0 2px 0 rgba(1,12,16,.2);background:rgba(30,55,
   .wordmark{font-size:clamp(58px,15.4vw,90px);margin-bottom:13px;line-height:1.12}
   .wordmark-sun{width:7px;height:7px;margin-left:10px}
   .lede{font-size:12px;line-height:1.85;margin-bottom:18px}
-  .drive-card{display:none}
+  .drive-manual{display:none}
+  .drive-card{padding:11px 13px}
+  .drive-card .mission-board{margin-top:0;padding:0;border:0;background:none}
   .cta-row{gap:8px}
   .cta-row .btn-primary{height:48px;padding:0 16px;gap:12px;font-size:12px}
   .cta-row .btn-ghost{height:48px;padding:0 12px;font-size:11px}
@@ -160,11 +162,18 @@ kbd{border-radius:3px;box-shadow:0 2px 0 rgba(1,12,16,.2);background:rgba(30,55,
   .intro-main{padding-top:24px}
   .wordmark{font-size:78px;margin-bottom:12px}
   .lede{font-size:13px;margin-bottom:18px}
-  .drive-card .mission-board{display:none}
-  .drive-card .drive-note{display:none}
+  .drive-card{padding:14px 16px}
+  .drive-card-head{padding-bottom:7px}
+  .drive-row{padding:4px 0;font-size:10.5px}
+  .drive-card .mission-board{margin-top:9px}
+  .drive-card .mission-row{padding:4px 0}
+  .drive-card .drive-note,.drive-card .mission-board-note{display:none}
   .mode-card{min-height:58px;padding:9px 12px}
   .intro .fov-panel{padding:8px 12px}
   .intro-foot{margin-top:16px;padding-top:12px}
+}
+@media (max-height:700px) and (min-width:761px){
+  .landscape-caption{display:none}
 }
 @media (max-width:760px) and (max-height:700px){
   .landscape-caption{display:none}
@@ -175,12 +184,18 @@ kbd{border-radius:3px;box-shadow:0 2px 0 rgba(1,12,16,.2);background:rgba(30,55,
   .intro-copy{max-width:560px}
   .wordmark{font-size:clamp(46px,8vw,70px);margin-bottom:12px}
   .eyebrow{margin-bottom:8px;font-size:8px}
-  .lede,.drive-card,.landscape-caption,.intro .fov-panel,.mobile-note{display:none}
+  .lede,.drive-manual,.landscape-caption,.intro .fov-panel,.mobile-note{display:none}
+  .drive-card{margin-top:10px;padding:9px 12px;max-width:720px}
+  .drive-card .mission-board{margin-top:0;padding:0;border:0;background:none}
   .intro-foot{margin-top:14px;padding-top:10px}
   .mode-row{margin-top:10px}
   .mode-card{min-height:50px;padding:8px 11px}
   .modal{padding:20px;max-height:calc(100dvh - 32px);overflow-y:auto}
   .speedo{bottom:16px;padding:7px 10px}
+}
+@media (min-width:640px) and (max-height:620px){
+  .drive-card .mission-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .drive-card .mission-row{padding:4px 0;border-bottom:0}
 }
 @media (prefers-reduced-motion:reduce){
   .mode-card,.btn-primary,.btn-ghost{transition:none}

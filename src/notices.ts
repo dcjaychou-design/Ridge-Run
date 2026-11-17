@@ -14,6 +14,38 @@ import type { NoticeEntry } from "./types";
 
 export const NOTICES: NoticeEntry[] = [
   {
+    id: "update-v2.6.0",
+    category: "update",
+    version: "v2.6.0",
+    date: "2026-11-17",
+    title: "全端悬赏看板、操控防误触与战书纪录同步",
+    summary:
+      "手机与笔记本首页现在都能直接查看悬赏任务；优化提示条布局避免遮挡车辆，补充防误触重开、坏链接提醒与常规战书新纪录同步。",
+    pinned: true,
+    items: [
+      {
+        tag: "NEW",
+        tone: "new",
+        text: "全端悬赏看板：手机竖屏、横屏以及常见笔记本分辨率首页均直接展示当前 3 项悬赏合约，发车前一眼掌握目标。",
+      },
+      {
+        tag: "NEW",
+        tone: "new",
+        text: "战书纪录与公平提示：常规战书使用自备车辆破纪录时，同步更新个人最佳与 PB 幽灵；每日模式进车库时补充公平规格提示。",
+      },
+      {
+        tag: "TUNE",
+        tone: "tune",
+        text: "操控安全与提示优先级：驾驶中改为连按两次 R 确认重开防误触，结算页支持单按 R 再跑一程；高优提示不再被单轮平衡等小提示顶掉，横屏提示条挪至速度表上方避免挡车。",
+      },
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "输入与链接细节：修复点击右上角按钮后按 Enter 误触、多指触碰踏板异常与画布右键卡键；打开损坏的 #challenge= 战书链接会给出明确提示。",
+      },
+    ],
+  },
+  {
     id: "update-v2.5.1",
     category: "update",
     version: "v2.5.1",
@@ -21,7 +53,6 @@ export const NOTICES: NoticeEntry[] = [
     title: "驾驶判定、防卡死与战报显示修复",
     summary:
       "修复多处影响爬坡体验的物理与判定问题：空中特技与幽灵超越口径更准确，解决大倾角卡死及空油倒车漏洞，并修正战报坡度方向。",
-    pinned: true,
     items: [
       {
         tag: "FIX",

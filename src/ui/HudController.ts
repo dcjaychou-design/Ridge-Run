@@ -13,6 +13,8 @@ import { byId } from "./dom";
 
 export { cameraWidthTag };
 
+export type ToastPriority = "low" | "normal" | "high";
+
 export class HudController {
   private readonly app = byId("app");
   private readonly hud = byId("hud");
@@ -61,6 +63,8 @@ export class HudController {
   private readonly comboValue = byId("comboValue");
 
   private toastTimer = 0;
+  private toastPriorityRank = 0;
+  private toastExpiresAt = 0;
   private last = {
     distance: -1,
     best: -1,
@@ -285,18 +289,32 @@ export class HudController {
     this.frame.style.setProperty("--frame-color", state.color);
   }
 
-  showToast(main: string, detail?: string): void {
+  showToast(
+    main: string,
+    detail?: string,
+    priority: ToastPriority = "normal",
+  ): void {
+    const now = globalThis.performance?.now() ?? Date.now();
+    const rank = priority === "high" ? 3 : priority === "low" ? 1 : 2;
+    if (now < this.toastExpiresAt && rank < this.toastPriorityRank) return;
+
+    this.toastPriorityRank = rank;
+    this.toastExpiresAt = now + 2200;
     this.toastMain.textContent = main;
     this.toastDetail.textContent = detail ?? "";
     this.toast.classList.add("is-visible");
     window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => {
+      this.toastPriorityRank = 0;
+      this.toastExpiresAt = 0;
       this.toast.classList.remove("is-visible");
     }, 2200);
   }
 
   hideToast(): void {
     window.clearTimeout(this.toastTimer);
+    this.toastPriorityRank = 0;
+    this.toastExpiresAt = 0;
     this.toast.classList.remove("is-visible");
   }
 }

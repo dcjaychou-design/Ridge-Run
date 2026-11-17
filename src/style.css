@@ -247,7 +247,7 @@ body.is-muted .mute-slash{opacity:1}
 
 /* ---------- toast ---------- */
 .toast{
-  position:absolute;z-index:90;left:50%;top:calc(150px + env(safe-area-inset-top,0px));transform:translate(-50%,-7px);
+  position:absolute;z-index:90;left:50%;top:calc(184px + env(safe-area-inset-top,0px));transform:translate(-50%,-7px);
   display:flex;align-items:baseline;gap:10px;padding:9px 13px 9px 12px;
   border-left:2px solid var(--amber);background:rgba(5,15,12,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,transform .22s ease,visibility .22s ease;
@@ -477,6 +477,10 @@ kbd{
 .garage-build{padding:20px 26px 22px;display:flex;flex-direction:column;min-width:0;background:linear-gradient(180deg,rgba(5,15,12,.16),rgba(5,15,12,.46))}
 .build-head{display:flex;justify-content:space-between;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:rgba(244,232,210,.5)}
 .build-head span:last-child{color:var(--amber)}
+.garage-mode-note{
+  margin:10px 0 2px;padding:8px 10px;border:1px solid rgba(137,216,200,.36);border-left:2px solid #89d8c8;
+  background:rgba(137,216,200,.08);font-family:var(--mono);font-size:9px;line-height:1.55;letter-spacing:.02em;color:#cdeee6;
+}
 .upgrade-list{display:flex;flex-direction:column;margin-top:2px}
 .upgrade-row{display:grid;grid-template-columns:52px minmax(0,1fr) 44px auto;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid rgba(244,232,210,.07);transition:opacity .2s ease}
 .upgrade-name span{display:block;font-size:12px;font-weight:700;letter-spacing:.04em}
@@ -519,10 +523,14 @@ kbd{
 .garage-action.is-disabled:hover{transform:none;background:var(--paper)}
 
 @media (max-width:760px){
-  .intro{padding:calc(18px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
+  .intro{overflow-y:auto;padding:calc(18px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
   .intro::before{left:max(18px,env(safe-area-inset-left,0px));right:max(18px,env(safe-area-inset-right,0px))}
-  .intro-main{grid-template-columns:1fr;gap:0;padding-top:64px}
-  .drive-card{display:none}
+  .intro-main{grid-template-columns:1fr;gap:12px;padding-top:64px}
+  .drive-manual{display:none}
+  .drive-card{padding-top:0;border-top:0}
+  .drive-card .mission-board{margin-top:0;padding:10px 12px;border:1px solid var(--line-soft);background:rgba(5,15,12,.45)}
+  .drive-card .mission-row{padding:5px 0}
+  .drive-card .mission-board-note{display:none}
   .wordmark{font-size:clamp(58px,16.2vw,108px);margin-bottom:16px;letter-spacing:-.06em}
   .wordmark .outline{-webkit-text-stroke-width:1.4px;text-stroke-width:1.4px}
   .lede{font-size:12px;line-height:1.8;margin-bottom:20px;max-width:24em}
@@ -560,7 +568,7 @@ kbd{
   .speedo{bottom:calc(16px + env(safe-area-inset-bottom,0px));width:96px}
   .speed-value{font-size:23px}
   .speed-label{font-size:7px}
-  .toast{top:calc(178px + env(safe-area-inset-top,0px));padding:8px 11px;max-width:calc(100vw - 32px);white-space:normal}
+  .toast{top:calc(188px + env(safe-area-inset-top,0px));padding:8px 11px;max-width:calc(100vw - 32px);white-space:normal}
   .toast strong{font-size:10px}
   .toast span{font-size:7px}
   .modal h2{font-size:clamp(38px,12vw,58px)}
@@ -618,9 +626,9 @@ kbd{
 }
 
 @media (max-height:620px){
-  .intro{padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .intro{overflow-y:auto;padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
   .intro::before{display:none}
-  .intro-main{grid-template-columns:1fr;gap:0;padding-top:14px}
+  .intro-main{grid-template-columns:1fr;gap:10px;padding-top:14px}
   .intro-copy{max-width:min(640px,78vw)}
   .eyebrow{margin-bottom:6px}
   .wordmark{font-size:clamp(48px,7.2vw,86px);margin-bottom:8px;line-height:.84}
@@ -632,8 +640,13 @@ kbd{
   .home-balance{height:42px}
   .press-hint{display:none}
   .mobile-note{display:block;margin-top:10px}
-  .drive-card{display:none}
+  .drive-manual{display:none}
+  .drive-card{padding-top:0;border-top:0}
+  .drive-card .mission-board{margin-top:0;padding:8px 10px;border:1px solid var(--line-soft);background:rgba(5,15,12,.45)}
+  .drive-card .mission-board-note{display:none}
   .intro-foot{display:none}
+  .toast{top:auto;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,7px)}
+  .toast.is-visible{transform:translate(-50%,0)}
   .record span{font-size:7px;margin-bottom:3px}
   .record strong{font-size:21px}
   .stamp{font-size:7px;letter-spacing:.12em}
@@ -837,7 +850,6 @@ kbd{
   .mode-card{padding:7px 28px 7px 10px}
   .mode-card-body small{display:none}
   .mode-card-body strong{font-size:11px}
-  .mission-board{display:none}
   .result-highlights{margin-top:9px}
   .result-highlight{padding:6px 8px 7px}
   .result-highlight b{font-size:13px}
@@ -928,7 +940,7 @@ kbd{
   .fov-controls{margin-top:5px}
 }
 
-/* Common laptop heights: keep the banner, FOV panel and six-row manual in view.
+/* Common laptop heights: keep the banner, FOV panel, compact manual and contracts in view.
    Placed after the FOV base rules so these compressions win the cascade. */
 @media (max-height:820px) and (min-height:621px){
   .intro{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
@@ -937,10 +949,14 @@ kbd{
   .lede{margin-bottom:16px}
   .cta-row{gap:10px}
   .mode-row{margin-top:10px}
-  .drive-row{padding:6px 0}
+  .drive-card{padding-top:10px}
+  .drive-card-head{padding-bottom:6px}
+  .drive-row{padding:4px 0;font-size:10.5px}
+  .drive-row kbd{min-width:20px;height:19px;font-size:8px}
   .fov-panel{margin-top:8px;padding:7px 11px 8px}
-  .drive-card .mission-board{display:none}
-  .drive-card .drive-note{display:none}
+  .drive-card .mission-board{margin-top:8px;padding-top:8px}
+  .drive-card .mission-row{padding:4px 0}
+  .drive-card .drive-note,.drive-card .mission-board-note{display:none}
   .intro-foot{margin-top:12px;padding-top:8px}
 }
 

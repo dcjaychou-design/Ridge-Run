@@ -165,11 +165,16 @@ export class Overlays {
       result.mode === "challenge" && result.challengeWin,
     );
     this.newRecord.hidden = !achieved;
-    this.newRecord.textContent = result.challengeWin
-      ? "击败对手 · 战书告捷"
-      : result.dailyRecord
-        ? "今日最佳刷新"
-        : "新的个人纪录";
+    this.newRecord.textContent =
+      result.challengeWin && result.record
+        ? "击败对手 · 并刷新个人最佳"
+        : result.challengeWin
+          ? "击败对手 · 战书告捷"
+          : result.dailyRecord
+            ? "今日最佳刷新"
+            : result.mode === "challenge" && result.record
+              ? "新的个人纪录 · 已同步常规赛"
+              : "新的个人纪录";
 
     if (result.mode === "challenge") {
       if (result.challengeWin) {

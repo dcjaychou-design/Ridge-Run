@@ -292,8 +292,14 @@ const atmosphereRenderer = new AtmosphereRenderer();
 const particles = new ParticleSystem();
 
 /* ---------- input ---------- */
+const RESTART_CONFIRM_WINDOW_MS = 1400;
 const keys: Record<string, boolean> = Object.create(null) as Record<string, boolean>;
 const touch = { gas: false, brake: false };
+const pedalPointers = {
+  gas: new Set<number>(),
+  brake: new Set<number>(),
+};
+let restartArmedAt = 0;
 
 function readGas(): boolean {
   return !!(keys["ArrowRight"] || keys["KeyD"] || keys["Space"] || touch.gas);
@@ -306,6 +312,8 @@ function readBrake(): boolean {
 function clearPressed(): void {
   touch.gas = false;
   touch.brake = false;
+  pedalPointers.gas.clear();
+  pedalPointers.brake.clear();
   for (const key of Object.keys(keys)) keys[key] = false;
   byId("gasBtn").classList.remove("is-pressed");
   byId("brakeBtn").classList.remove("is-pressed");
@@ -482,7 +490,7 @@ function beginJump(): void {
   particles.spawnDust(car.x - 0.8, heightAt(car.x - 0.8), -1, car.vx);
   particles.spawnDust(car.x + 0.8, heightAt(car.x + 0.8), 1, car.vx);
   audio.takeoff();
-  hud.showToast("腾空", "稳住车身，跨越飞跃门槛");
+  hud.showToast("腾空", "稳住车身，跨越飞跃门槛", "low");
 }
 
 function triggerJumpTier(tier: JumpTier): void {
@@ -501,7 +509,11 @@ function triggerJumpTier(tier: JumpTier): void {
   particles.spawnShockwave(car.x, car.y, stage.color, 3.6 + tier * 1.8);
   particles.spawnJumpBurst(car.x, car.y, tier, stage.color);
   audio.jump(tier);
-  hud.showToast(stage.title, `落地结算 +${stage.reward} 金币`);
+  hud.showToast(
+    stage.title,
+    `落地结算 +${stage.reward} 金币`,
+    tier === 1 ? "low" : "normal",
+  );
 }
 
 function triggerFlip(totalFlips: number): void {
@@ -930,6 +942,7 @@ function startRun(mode: RunMode = runMode): void {
   overlays.hideAll();
   overlays.hideNotice();
   resetRun();
+  restartArmedAt = 0;
   state = "playing";
   clearPressed();
   accumulator = 0;
@@ -966,6 +979,7 @@ function startRun(mode: RunMode = runMode): void {
 
 function pauseGame(): void {
   if (state !== "playing") return;
+  restartArmedAt = 0;
   state = "paused";
   clearPressed();
   hud.hideToast();
@@ -992,6 +1006,8 @@ function endRun(reason: RunEndReason): void {
   if (state !== "playing") return;
   const finalDistance = Math.floor(distance);
   const mode = runMode;
+  const standardChallenge =
+    mode === "challenge" && runConfig.recordMode === "standard";
   let record = false;
   let dailyRecord = false;
   let challengeWin = false;
@@ -1008,6 +1024,10 @@ function endRun(reason: RunEndReason): void {
   } else if (mode === "challenge" && activeGhost) {
     challengeWin = finalDistance > activeGhost.record.distance;
     if (challengeWin) endBounty += CHALLENGE_WIN_BOUNTY;
+    if (standardChallenge) {
+      record = finalDistance > save.best;
+      if (record) save.best = finalDistance;
+    }
   }
 
   const finishedGhost = ghostRecorder.finish(
@@ -1017,7 +1037,9 @@ function endRun(reason: RunEndReason): void {
     car.angle,
   );
   if (finishedGhost) {
-    if (mode === "standard" && record) save.bestGhost = finishedGhost;
+    if ((mode === "standard" || standardChallenge) && record) {
+      save.bestGhost = finishedGhost;
+    }
     if (mode === "daily" && dailyRecord) save.dailyGhost = finishedGhost;
   }
 
@@ -1081,6 +1103,7 @@ function endRun(reason: RunEndReason): void {
 
   persistSave(save, true);
 
+  restartArmedAt = 0;
   state = "over";
   clearPressed();
   hud.setMode("over");
@@ -1108,6 +1131,7 @@ function endRun(reason: RunEndReason): void {
 
 function goHome(): void {
   if (garage.isOpen) garage.close();
+  restartArmedAt = 0;
   state = "intro";
   runMode = "standard";
   if (refreshDaily(save) && !getSaveReport().preserveRawPrimary) {
@@ -1157,7 +1181,7 @@ function respawn(auto: boolean): void {
   hasTouchedGround = false;
   snapVisualCar();
   addShake(auto ? 0.45 : 0.28);
-  hud.showToast("脱困整备", `消耗 ${RESPAWN_FUEL_COST}% 燃油 · 退回安全坡面`);
+  hud.showToast("脱困整备", `消耗 ${RESPAWN_FUEL_COST}% 燃油 · 退回安全坡面`, "high");
 }
 
 /** Front wheel up, rear wheel down, nose held above the local slope. */
@@ -1191,7 +1215,7 @@ function updateWheelie(dt: number): void {
   const rear = car.wheelWorld[0]!;
   particles.spawnWheelieSpark(rear.x, heightAt(rear.x));
   audio.coinPickup(runCoins);
-  hud.showToast(`单轮平衡 +${WHEELIE_REWARD}`, "后轮着地摩擦火花");
+  hud.showToast(`单轮平衡 +${WHEELIE_REWARD}`, "后轮着地摩擦火花", "low");
 }
 
 function updateGhost(): void {
@@ -1221,6 +1245,7 @@ function triggerGhostOvertake(): void {
   hud.showToast(
     "超越目标 · 刷新山脊领跑线！",
     `${kind === "pb" ? "PB" : "RIVAL"} ${target}m 已甩在身后`,
+    "high",
   );
 }
 
@@ -1241,6 +1266,7 @@ function updateMissions(dt: number): void {
     hud.showToast(
       `悬赏达成 · ${missionTitle(mission)}`,
       `+${mission.reward} 金币 · 已入账`,
+      "high",
     );
   }
   if (completed.length > 0) persistSave(save, true);
@@ -1375,7 +1401,7 @@ function simulate(dt: number): void {
     particles.spawnShockwave(car.x, car.y, "#eb633a", 5.5);
     particles.spawnJumpBurst(car.x, car.y, 2, "#eb633a");
     audio.crash();
-    hud.showToast("翻车失控", "本程即将结算");
+    hud.showToast("翻车失控", "本程即将结算", "high");
   }
 
   if (car.crashed) {
@@ -1434,7 +1460,7 @@ function simulate(dt: number): void {
   const stage = stageInfoAt(distance);
   if (stage.globalStage > lastStageGlobal) {
     lastStageGlobal = stage.globalStage;
-    hud.showToast(`进入赛段 · ${stage.name}`, stage.hint);
+    hud.showToast(`进入赛段 · ${stage.name}`, stage.hint, "high");
   }
 
   updateGhost();
@@ -1447,13 +1473,13 @@ function simulate(dt: number): void {
   const fuelRatio = fuel / stats.fuelCapacity;
   if (fuelRatio <= LOW_FUEL_RATIO && !lowFuelWarned && !car.crashed) {
     lowFuelWarned = true;
-    hud.showToast("燃油告急", "寻找下一个红色油桶");
+    hud.showToast("燃油告急", "寻找下一个红色油桶", "high");
   }
   if (fuel <= 0 && !car.crashed) {
     emptyTimer += dt;
     if (!emptyWarned) {
       emptyWarned = true;
-      hud.showToast("燃油耗尽", "靠惯性寻找下坡");
+      hud.showToast("燃油耗尽", "靠惯性寻找下坡", "high");
     }
     const speed = Math.hypot(car.vx, car.vy);
     if ((speed < 0.9 && emptyTimer > 1.4) || emptyTimer > 15) {
@@ -1598,7 +1624,15 @@ const garage = new GarageModal(save, {
 function openGarage(): void {
   if (state === "playing") return;
   audio.ensure();
-  garage.open();
+  const fairLocked =
+    state === "over" &&
+    (runMode === "daily" ||
+      (runMode === "challenge" && runConfig.recordMode === "daily"));
+  garage.open(
+    fairLocked
+      ? "当前为每日公平赛（锁定官方车型与全 Lv.5 规格）；此处的选车与改装仅对常规赛及常规战书生效。"
+      : undefined,
+  );
 }
 
 /* ---------- events ---------- */
@@ -1724,9 +1758,19 @@ function handleKeyDown(event: KeyboardEvent): void {
     return;
   }
   if (code === "KeyR") {
-    if (state === "playing" || state === "paused") {
+    if (state === "paused" || state === "over") {
       event.preventDefault();
       startRun();
+    } else if (state === "playing") {
+      event.preventDefault();
+      const now = performance.now();
+      if (now - restartArmedAt <= RESTART_CONFIRM_WINDOW_MS) {
+        restartArmedAt = 0;
+        startRun();
+      } else {
+        restartArmedAt = now;
+        hud.showToast("再按一次 R 重开本程", "防止误触 · 1.4 秒内确认", "high");
+      }
     }
     return;
   }
@@ -1738,6 +1782,14 @@ function handleKeyDown(event: KeyboardEvent): void {
   if (code === "KeyG" && (state === "intro" || state === "over")) {
     event.preventDefault();
     openGarage();
+    return;
+  }
+  if (
+    state === "playing" &&
+    targetTag === "BUTTON" &&
+    (code === "Enter" || code === "NumpadEnter")
+  ) {
+    event.preventDefault();
     return;
   }
   if (
@@ -1758,9 +1810,11 @@ function handleKeyUp(event: KeyboardEvent): void {
 }
 
 function bindPedal(button: HTMLElement, name: "gas" | "brake"): void {
+  const active = pedalPointers[name];
   const press = (event: PointerEvent): void => {
     event.preventDefault();
     audio.ensure();
+    active.add(event.pointerId);
     touch[name] = true;
     button.classList.add("is-pressed");
     try {
@@ -1770,14 +1824,19 @@ function bindPedal(button: HTMLElement, name: "gas" | "brake"): void {
     }
   };
   const release = (event?: PointerEvent): void => {
-    touch[name] = false;
-    button.classList.remove("is-pressed");
     if (event && event.pointerId != null) {
+      active.delete(event.pointerId);
       try {
         button.releasePointerCapture(event.pointerId);
       } catch (_) {
         /* already released */
       }
+    } else {
+      active.clear();
+    }
+    if (active.size === 0) {
+      touch[name] = false;
+      button.classList.remove("is-pressed");
     }
   };
   button.addEventListener("pointerdown", press);
@@ -1797,6 +1856,7 @@ function notifyStorageError(): void {
   hud.showToast(
     "存档写入受限",
     "本地存储空间不足或已禁用，当前进度仅保存在内存中",
+    "high",
   );
 }
 
@@ -1836,6 +1896,7 @@ function boot(): void {
     hud.showToast(
       "本地存档受限",
       "浏览器禁止读取存储，将以只读内存模式运行并保留原存档",
+      "high",
     );
   } else if (startupReport.corruptRecovered) {
     if (startupReport.writeFailed) lastStorageToastAt = performance.now();
@@ -1846,18 +1907,23 @@ function boot(): void {
         : startupReport.backupSaved
           ? "已备份异常数据至 ridge-run-v2-backup，但新存档写入受限（暂存内存）"
           : "备份与写入受限，当前以只读内存模式运行并保留原存档",
+      "high",
     );
   } else if (startupReport.writeFailed) {
     lastStorageToastAt = performance.now();
     hud.showToast(
       "存档写入受限",
       "初始存档写入或迁移失败（存储空间不足或已禁用），当前仅保存在内存中",
+      "high",
     );
   } else if (startupReport.repairedFields.length > 0) {
     hud.showToast(
       "存档字段已修复",
       "检测到异常数值或记录，其余有效进度已保留",
+      "high",
     );
+  } else {
+    challengeController.notifyInvalidBootHash();
   }
 
   requestAnimationFrame(frame);
@@ -1913,21 +1979,29 @@ byId("posterCopyBtn").addEventListener("click", () =>
 byId("posterCloseBtn").addEventListener("click", () =>
   overlays.hidePoster(),
 );
-byId("pauseBtn").addEventListener("click", pauseGame);
+byId("pauseBtn").addEventListener("click", (event) => {
+  (event.currentTarget as HTMLElement | null)?.blur();
+  pauseGame();
+});
 byId("resumeBtn").addEventListener("click", resumeGame);
 byId("pauseRestartBtn").addEventListener("click", () => startRun());
 byId("pauseHomeBtn").addEventListener("click", goHome);
 byId("againBtn").addEventListener("click", () => startRun());
 byId("homeBtn").addEventListener("click", goHome);
-byId("muteBtn").addEventListener("click", () => {
+byId("muteBtn").addEventListener("click", (event) => {
   audio.ensure();
   audio.toggleMuted();
+  (event.currentTarget as HTMLElement | null)?.blur();
 });
 byId("pauseMuteBtn").addEventListener("click", () => {
   audio.ensure();
   audio.toggleMuted();
 });
-byId("fovBtn").addEventListener("click", cycleCameraPreset);
+byId("fovBtn").addEventListener("click", (event) => {
+  cycleCameraPreset();
+  (event.currentTarget as HTMLElement | null)?.blur();
+});
+canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 for (const id of ["introFovRange", "pauseFovRange"] as const) {
   const input = byId<HTMLInputElement>(id);
   const apply = (): void => setCameraWidth(Number(input.value));
