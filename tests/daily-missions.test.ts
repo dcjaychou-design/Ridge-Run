@@ -14,7 +14,10 @@ import {
   utcDateKey,
 } from "../src/daily.ts";
 import {
+  MISSION_TEMPLATES,
   MissionTracker,
+  missionDetail,
+  missionTitle,
   rollMissions,
   settleCompletedMissions,
 } from "../src/missions.ts";
@@ -139,4 +142,25 @@ test("MissionTracker updates progress and settleCompletedMissions rotates comple
     tracker.missions.map((m) => m.id),
     beforeIds,
   );
+});
+
+test("all six mission templates scale targets and rewards across three tiers", () => {
+  for (const template of Object.values(MISSION_TEMPLATES)) {
+    assert.equal(template.targets.length, 3);
+    assert.equal(template.rewards.length, 3);
+    for (let i = 1; i < 3; i++) {
+      assert.ok(template.targets[i]! > template.targets[i - 1]!);
+      assert.ok(template.rewards[i]! > template.rewards[i - 1]!);
+    }
+  }
+  const summitStage = {
+    id: "stage-1500",
+    kind: "stage" as const,
+    target: 1500,
+    reward: MISSION_TEMPLATES.stage.rewards[2]!,
+    progress: 0,
+    done: false,
+  };
+  assert.equal(missionTitle(summitStage), "驶入极夜山巅");
+  assert.match(missionDetail(summitStage), /1500m/);
 });

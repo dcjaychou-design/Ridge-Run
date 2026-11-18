@@ -276,7 +276,10 @@ function normalize(raw: unknown, repaired: string[]): GameSave {
   // v2.1 additions: ghosts, daily board and pit contracts. Older saves simply
   // keep their coins / best / garage and receive the new defaults.
   const bestGhost = sanitizeGhostRecord(source.bestGhost);
-  save.bestGhost = bestGhost && bestGhost.mode === "standard" ? bestGhost : null;
+  save.bestGhost =
+    bestGhost && bestGhost.mode === "standard" && bestGhost.distance <= save.best
+      ? bestGhost
+      : null;
   if (
     source.bestGhost !== undefined &&
     source.bestGhost !== null &&
@@ -307,7 +310,8 @@ function normalize(raw: unknown, repaired: string[]): GameSave {
     dailyGhost &&
     dailyGhost.mode === "daily" &&
     dailyGhost.dateKey === save.dailyDate &&
-    dailyGhost.seed === dailySeedFor(save.dailyDate)
+    dailyGhost.seed === dailySeedFor(save.dailyDate) &&
+    dailyGhost.distance <= save.dailyBest
       ? dailyGhost
       : null;
   if (

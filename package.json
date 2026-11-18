@@ -1,7 +1,7 @@
 {
   "name": "ridge-run",
   "private": true,
-  "version": "2.6.1",
+  "version": "2.7.0",
   "description": "Pure frontend endless hill-climb racer powered by Canvas 2D and Web Audio API.",
   "license": "MIT",
   "type": "module",

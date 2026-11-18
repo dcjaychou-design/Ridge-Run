@@ -15,12 +15,22 @@ export function generateChunkItems(chunk: number, items: Item[]): void {
   );
   const baseX = START_X + chunk * CHUNK;
   let coinStart = Number.POSITIVE_INFINITY;
+  let coinEnd = Number.NEGATIVE_INFINITY;
   let fuelX = Number.POSITIVE_INFINITY;
+  let magnetX = Number.POSITIVE_INFINITY;
+
+  const isClear = (x: number): boolean => {
+    if (Math.abs(x - fuelX) <= 5.5) return false;
+    if (Math.abs(x - magnetX) <= 5.5) return false;
+    if (x >= coinStart - 5.5 && x <= coinEnd + 4.5) return false;
+    return true;
+  };
 
   if (chunk % 2 === 1) {
     const count = 3 + Math.floor(rng() * 3);
-    const start = baseX + 7 + rng() * 15;
+    const start = baseX + 10 + rng() * 11;
     coinStart = start;
+    coinEnd = start + (count - 1) * 3.15;
     const lift = 1.08 + rng() * 0.5;
     for (let i = 0; i < count; i++) {
       const x = start + i * 3.15;
@@ -37,7 +47,9 @@ export function generateChunkItems(chunk: number, items: Item[]): void {
     }
   }
 
-  if (chunk === 1 || (chunk > 3 && chunk % 4 === 1)) {
+  // Fuel spawns on evenly spaced even chunks (2, 6, 10...) so it never lands inside
+  // odd-chunk coin arcs and the first pickup arrives once the tank has room for +34.
+  if (chunk >= 2 && chunk % 4 === 2) {
     const x = baseX + 13 + rng() * 17;
     fuelX = x;
     items.push({
@@ -51,14 +63,15 @@ export function generateChunkItems(chunk: number, items: Item[]): void {
     });
   }
 
-  // Turbo cylinder: from the 2nd chunk onward, in the climb-in section.
-  if (chunk >= 1 && rng() < 0.35) {
-    const x = baseX + 4 + rng() * 11;
-    if (Math.abs(x - fuelX) > 5.5) {
+  // Magnet beacon: placed well ahead of an odd-chunk coin ribbon.
+  if (Number.isFinite(coinStart) && rng() < 0.25) {
+    const x = Math.max(baseX + 3, coinStart - 7 - rng() * 3);
+    if (isClear(x)) {
+      magnetX = x;
       items.push({
-        type: "nitro",
+        type: "magnet",
         x,
-        y: heightAt(x) - 1.2,
+        y: heightAt(x) - 1.55,
         vx: 0,
         vy: 0,
         phase: rng() * TAU,
@@ -67,14 +80,27 @@ export function generateChunkItems(chunk: number, items: Item[]): void {
     }
   }
 
-  // Magnet beacon: just ahead of a coin ribbon, so it charges before the arc.
-  if (Number.isFinite(coinStart) && rng() < 0.25) {
-    const x = Math.max(baseX + 3, coinStart - 8 - rng() * 4);
-    if (Math.abs(x - fuelX) > 5.5) {
+  // Turbo cylinder: placed in an unoccupied stretch of the chunk.
+  if (chunk >= 1 && rng() < 0.35) {
+    const u = rng();
+    const candidates =
+      chunk % 2 === 0
+        ? [
+            Number.isFinite(fuelX) ? baseX + 3.5 + u * 3.5 : baseX + 6 + u * 24,
+            Number.isFinite(fuelX) ? fuelX + 6.5 + u * Math.max(0, baseX + 40 - fuelX - 6.5) : -1,
+          ]
+        : [
+            baseX + 3 + u * 3.5,
+            coinEnd + 5 + u * 4,
+          ];
+    const picked = candidates.find(
+      (x) => x >= baseX + 2.5 && x <= baseX + CHUNK - 3 && isClear(x),
+    );
+    if (picked !== undefined) {
       items.push({
-        type: "magnet",
-        x,
-        y: heightAt(x) - 1.55,
+        type: "nitro",
+        x: picked,
+        y: heightAt(picked) - 1.2,
         vx: 0,
         vy: 0,
         phase: rng() * TAU,

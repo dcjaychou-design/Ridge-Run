@@ -18,7 +18,7 @@ export const MISSION_TEMPLATES: Record<MissionKind, MissionTemplate> = {
     unit: "m",
     accent: "#f0b15e",
     targets: [300, 600, 1000],
-    rewards: [35, 50, 65],
+    rewards: [35, 52, 70],
   },
   flips: {
     label: "空中转体",
@@ -41,24 +41,24 @@ export const MISSION_TEMPLATES: Record<MissionKind, MissionTemplate> = {
     english: "COINS",
     unit: "枚",
     accent: "#e1c79a",
-    targets: [18, 32, 50],
-    rewards: [30, 42, 55],
+    targets: [15, 28, 42],
+    rewards: [32, 48, 65],
   },
   wheelie: {
     label: "单轮平衡",
     english: "WHEELIE",
     unit: "s",
     accent: "#8ca494",
-    targets: [2, 4],
-    rewards: [45, 45],
+    targets: [2, 3.5, 5],
+    rewards: [35, 50, 70],
   },
   stage: {
     label: "深入秘境",
     english: "STAGE",
     unit: "m",
     accent: "#9fe8da",
-    targets: [500, 1000],
-    rewards: [50, 80],
+    targets: [500, 1000, 1500],
+    rewards: [45, 65, 90],
   },
 };
 
@@ -87,6 +87,7 @@ function tierFor(kind: MissionKind, completed: number): number {
 
 export function missionTitle(mission: MissionState): string {
   if (mission.kind === "stage") {
+    if (mission.target >= 1500) return "驶入极夜山巅";
     return mission.target >= 1000 ? "驶入赤岩峡谷" : "驶入高寒冰川";
   }
   return MISSION_TEMPLATES[mission.kind].label;
@@ -106,6 +107,7 @@ export function missionDetail(mission: MissionState): string {
     case "wheelie":
       return `单局累计单轮平衡 ${mission.target}s`;
     case "stage":
+      if (mission.target >= 1500) return "单局驶入极夜山巅（1500m）";
       return mission.target >= 1000
         ? "单局驶入赤岩峡谷（1000m）"
         : "单局驶入高寒冰川（500m）";

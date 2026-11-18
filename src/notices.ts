@@ -14,6 +14,38 @@ import type { NoticeEntry } from "./types";
 
 export const NOTICES: NoticeEntry[] = [
   {
+    id: "update-v2.7.0",
+    category: "update",
+    version: "v2.7.0",
+    date: "2026-11-18",
+    title: "道具节奏重整、悬赏三档平衡与多周目阶段展示",
+    summary:
+      "优化开局油桶站位与道具互斥间距，统一六类悬赏三档进阶奖励并补充 1500m 极夜目标；冲破 2000m 后将累计显示多周目阶段号与周目提示。",
+    pinned: true,
+    items: [
+      {
+        tag: "TUNE",
+        tone: "tune",
+        text: "油桶节奏与防重叠：首个油桶后移至约 100–120m 路段且此后每 4 个路段稳定刷新，既避免满油浪费又消除油桶、氮气瓶、磁铁与金币串同段叠放。",
+      },
+      {
+        tag: "NEW",
+        tone: "new",
+        text: "悬赏三档升级：六类悬赏统一补全三档目标与递进赏金——单轮平衡调整为 2 / 3.5 / 5s，金币矿脉收紧为 15 / 28 / 42 枚，深入秘境新增 1500m 极夜山巅目标。",
+      },
+      {
+        tag: "NEW",
+        tone: "new",
+        text: "多周目赛段标识：冲出 2000m 进入新循环后，赛段徽标与门牌按 STAGE 05+ 连续递增，局内提示与战术战报同步标注周目进度。",
+      },
+      {
+        tag: "FIX",
+        tone: "fix",
+        text: "幽灵存档一致性：读档时校验个人最佳与每日最佳幽灵距离不高于已保存纪录，自动清理越界或失效幽灵残影。",
+      },
+    ],
+  },
+  {
     id: "update-v2.6.1",
     category: "update",
     version: "v2.6.1",
@@ -21,7 +53,6 @@ export const NOTICES: NoticeEntry[] = [
     title: "画面过渡丝滑、幽灵雷达补全与省电优化",
     summary:
       "平滑赛段交界处的草木岩纹与轮胎印过渡，修复车身号码字体、轻骑天线动态及幽灵雷达边界盲区，并减少暂停、弹窗与切后台时的耗电。",
-    pinned: true,
     items: [
       {
         tag: "TUNE",

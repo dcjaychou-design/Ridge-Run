@@ -9,6 +9,8 @@ import {
   SAVE_BACKUP_KEY,
   SAVE_KEY,
 } from "../src/constants.ts";
+import { dailySeedFor, dailyVehicleFor } from "../src/daily.ts";
+import { GhostRecorder } from "../src/ghost/GhostSystem.ts";
 import {
   getLastWriteError,
   getSaveReport,
@@ -198,5 +200,67 @@ test("protects blocked reads and notifies listener on runtime write failure", ()
     assert.equal(errorCount, 1);
     assert.equal(getSaveReport().writeFailed, true);
     assert.equal(getLastWriteError(), "QuotaExceededError");
+  });
+});
+
+test("rejects stale ghosts whose distance exceeds saved best or dailyBest", () => {
+  const buildGhost = (
+    mode: "standard" | "daily",
+    seed: number,
+    vehicleId: "rally" | "moto" | "truck",
+    distance: number,
+    dateKey?: string,
+  ) => {
+    const rec = new GhostRecorder();
+    rec.reset({ mode, seed, dateKey, vehicleId });
+    for (let i = 0; i <= 10; i++) {
+      rec.tick(0.15, 6 + (distance * i) / 10, 0, 0);
+    }
+    return rec.finish(distance, 6 + distance, 0, 0)!;
+  };
+
+  const dailyDate = "2026-11-18";
+  const dailySeed = dailySeedFor(dailyDate);
+  const dailyVehicle = dailyVehicleFor(dailySeed);
+
+  const inconsistent = new MemoryStorage();
+  inconsistent.setItem(
+    SAVE_KEY,
+    JSON.stringify({
+      best: 300,
+      bestGhost: buildGhost("standard", 0, "rally", 520),
+      dailyDate,
+      dailyBest: 200,
+      dailyGhost: buildGhost("daily", dailySeed, dailyVehicle, 480, dailyDate),
+    }),
+  );
+
+  withMockStorage(inconsistent, () => {
+    const save = loadSave();
+    const report = getSaveReport();
+    assert.equal(save.bestGhost, null);
+    assert.equal(save.dailyGhost, null);
+    assert.ok(report.repairedFields.includes("bestGhost"));
+    assert.ok(report.repairedFields.includes("dailyGhost"));
+  });
+
+  const consistent = new MemoryStorage();
+  consistent.setItem(
+    SAVE_KEY,
+    JSON.stringify({
+      best: 520,
+      bestGhost: buildGhost("standard", 0, "rally", 520),
+      dailyDate,
+      dailyBest: 480,
+      dailyGhost: buildGhost("daily", dailySeed, dailyVehicle, 480, dailyDate),
+    }),
+  );
+
+  withMockStorage(consistent, () => {
+    const save = loadSave();
+    const report = getSaveReport();
+    assert.equal(save.bestGhost?.distance, 520);
+    assert.equal(save.dailyGhost?.distance, 480);
+    assert.equal(report.repairedFields.length, 0);
   });
 });

@@ -1481,7 +1481,11 @@ function simulate(dt: number): void {
   const stage = stageInfoAt(distance);
   if (stage.globalStage > lastStageGlobal) {
     lastStageGlobal = stage.globalStage;
-    hud.showToast(`进入赛段 · ${stage.name}`, stage.hint, "high");
+    hud.showToast(
+      stage.cycle > 0 ? `第 ${stage.cycle + 1} 周目 · ${stage.name}` : `进入赛段 · ${stage.name}`,
+      stage.cycle > 0 ? `${stage.hint} · 地势起伏加剧` : stage.hint,
+      "high",
+    );
   }
 
   updateGhost();

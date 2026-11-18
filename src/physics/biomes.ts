@@ -314,7 +314,7 @@ export function stageInfoAt(distance: number): StageInfo {
     index,
     cycle: Math.floor(globalStage / STAGE_COUNT),
     globalStage,
-    stageLabel: `STAGE 0${index + 1}`,
+    stageLabel: `STAGE ${String(globalStage + 1).padStart(2, "0")}`,
     name: def.name,
     english: def.english,
     hint: def.hint,

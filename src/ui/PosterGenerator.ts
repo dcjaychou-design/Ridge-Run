@@ -578,7 +578,9 @@ export class PosterGenerator {
   ): void {
     this.text(
       ctx,
-      "赛段足迹 / STAGE ROUTE",
+      current.cycle > 0
+        ? `赛段足迹 · 第 ${current.cycle + 1} 周目 / STAGE ROUTE`
+        : "赛段足迹 / STAGE ROUTE",
       62,
       448,
       `500 9px ${MONO}, ${SANS}`,
