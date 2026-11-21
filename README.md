@@ -204,8 +204,12 @@ npm run preview   # 本地预览生产构建
 ├── index.html                         # 单页入口、HUD / 弹窗 DOM 结构与元信息
 ├── package.json                       # 版本信息、Node>=22.18 声明与 npm 脚本
 ├── tsconfig.json / vite.config.ts     # 严格 TypeScript 配置与 Vite 相对路径构建
+├── AGENTS.md / CLAUDE.md              # 跨 Agent 项目工程规范、协作评审与交付约束
 ├── LICENSE                            # MIT 开源协议
 ├── .github/workflows/deploy.yml       # CI：npm ci && npm test && npm run build -> Pages
+├── .agents/skills/
+│   ├── subsystem-invariants/SKILL.md  # 各子系统架构不变量与防回归检查清单
+│   └── release-and-docs-sync/SKILL.md # 版本四处联动、README 与山脊公报写作规范
 ├── public/
 │   ├── icon.svg                       # SVG 矢量图标
 │   └── manifest.webmanifest           # Web App Manifest
@@ -259,7 +263,8 @@ npm run preview   # 本地预览生产构建
     ├── render-cache.test.ts           # 远景分帧/DPR 刷新、极光/云层缓存、字体重绘与过渡权重
     ├── strata-cache.test.ts           # 岩层缓存复用、种子失效与上限回归
     ├── showcase.test.ts               # 首页展示贴坡与视角隔离测试
-    └── ui-performance.test.ts         # HUD 无变更零写入、Toast 优先级与隐藏悬赏延后刷新
+    ├── ui-performance.test.ts         # HUD 无变更零写入、Toast 优先级与隐藏悬赏延后刷新
+    └── docs-sync.test.ts              # 版本号四处联动、山脊公报结构与 README 工程路径校验
 ```
 
 ### 性能设计、节能策略与实测数据
@@ -295,7 +300,7 @@ npm run preview   # 本地预览生产构建
 
 ## 参与贡献与开源协议
 
-欢迎提交 Issue 反馈问题或建议，也欢迎 Fork 本仓库后发起 Pull Request。提交前请确保本地通过全量测试与严格构建：
+欢迎提交 Issue 反馈问题或建议，也欢迎 Fork 本仓库后发起 Pull Request。若使用 AI 编程助手协作修改本仓库，请先遵循项目根目录的 [AGENTS.md](./AGENTS.md) 与 [`.agents/skills/`](./.agents/skills/) 约定（Claude Code 可自动识别 [CLAUDE.md](./CLAUDE.md)）。提交前请确保本地通过全量测试与严格构建：
 
 ```sh
 npm test && npm run build
